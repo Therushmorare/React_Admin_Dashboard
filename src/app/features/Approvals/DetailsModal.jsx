@@ -1,13 +1,13 @@
 "use client";
 
-import React, { useState, useMemo } from "react";
+import React, { useState } from "react";
 import { XCircle, CheckCircle, Calendar, AlertCircle } from "lucide-react";
 import { PRIORITY_COLORS } from "../../constants/approvals/constants";
 
 // ----------------- config -----------------
 const API_BASE = "https://jellyfish-app-z83s2.ondigitalocean.app";
 
-// ---- helpers already used elsewhere ----
+// ---- helpers ----
 const formatMoney = (money) => {
   if (typeof money === "number") {
     try {
@@ -32,74 +32,63 @@ const safePriorityClasses = (priority) => {
   return `${colors.bg} ${colors.text}`;
 };
 
-// ----------------- NEW helpers: auth + API chooser -----------------
+// --------- auth + stage helpers ----------
 const getAuth = () => {
   const token = typeof window !== "undefined" ? sessionStorage.getItem("access_token") : null;
   const adminId = typeof window !== "undefined" ? sessionStorage.getItem("admin_id") : null;
-  const adminRole = typeof window !== "undefined" ? sessionStorage.getItem("admin_role") : null; // "MANAGER" | "FINANCE" | "SUPERUSER"
+  const adminRole = typeof window !== "undefined" ? sessionStorage.getItem("admin_role") : null; // MANAGER | FINANCE | SUPERUSER
   const adminDept = typeof window !== "undefined" ? sessionStorage.getItem("admin_department") : null;
-  const employeeId = typeof window !== "undefined" ? sessionStorage.getItem("user_id") : null; // fallback if needed
+  const employeeId = typeof window !== "undefined" ? sessionStorage.getItem("user_id") : null;
   return { token, adminId, adminRole, adminDept, employeeId };
 };
 
-// Optional: derive stage flags from the job if your API provides them.
-// We fall back to simple status checks if not available.
 const extractStage = (job) => {
-  // Expected booleans if backend sends them; otherwise infer best-effort
   const departmentApproved =
-    job?.departmentApproved ?? job?.deptApproved ?? (job?.status?.toUpperCase?.() === "DEPT_APPROVED" ? true : false);
+    job?.departmentApproved ?? job?.deptApproved ?? (job?.status?.toUpperCase?.() === "DEPT_APPROVED");
   const financeApproved =
-    job?.financeApproved ?? (job?.status?.toUpperCase?.() === "FINANCE_APPROVED" ? true : false);
+    job?.financeApproved ?? (job?.status?.toUpperCase?.() === "FINANCE_APPROVED");
   const superuserApproved =
-    job?.superuserApproved ?? (job?.status?.toUpperCase?.() === "APPROVED" ? true : false);
-  return { departmentApproved, financeApproved, superuserApproved };
+    job?.superuserApproved ?? (job?.status?.toUpperCase?.() === "APPROVED");
+  return { departmentApproved: !!departmentApproved, financeApproved: !!financeApproved, superuserApproved: !!superuserApproved };
 };
 
 const roleApproveLabel = (role) =>
-  role === "MANAGER" ? "Approve (Department)" : role === "FINANCE" ? "Approve (Finance)" : role === "SUPERUSER" ? "Approve (Superuser)" : "Approve";
+  role === "MANAGER" ? "Approve (Department)" :
+  role === "FINANCE" ? "Approve (Finance)" :
+  role === "SUPERUSER" ? "Approve (Superuser)" : "Approve";
 
-const canRejectForRole = (role) => role === "MANAGER" || role === "SUPERUSER"; // finance endpoint has no reject
+const canRejectForRole = (role) => role === "MANAGER" || role === "SUPERUSER";
 
-// Build endpoint + payload for APPROVE
+// --------- API builders ----------
 const buildApproveRequest = ({ role, dept, adminId, token, job }) => {
   const jid = job?.id || job?.job_id;
-  const eid = job?.poster_id || job?.employee_id || getAuth().employeeId; // best guess
+  const eid = job?.poster_id || job?.employee_id || getAuth().employeeId;
   if (!adminId || !jid) throw new Error("Missing admin_id or job_id.");
 
   if (role === "MANAGER" && (dept || "").toLowerCase() === "job post department") {
     return {
       url: `${API_BASE}/api/admin/departmentApprove/${adminId}/${eid}/${jid}`,
       body: { admin_id: adminId, employee_id: eid, job_id: jid, status: "APPROVED" },
-      headers: {
-        "Content-Type": "application/json",
-        ...(token ? { Authorization: `Bearer ${token}` } : {}),
-      },
+      headers: { "Content-Type": "application/json", ...(token ? { Authorization: `Bearer ${token}` } : {}) },
     };
   }
   if (role === "FINANCE") {
     return {
       url: `${API_BASE}/api/admin/financeApproval/${adminId}/${jid}`,
       body: { admin_id: adminId, job_id: jid },
-      headers: {
-        "Content-Type": "application/json",
-        ...(token ? { Authorization: `Bearer ${token}` } : {}),
-      },
+      headers: { "Content-Type": "application/json", ...(token ? { Authorization: `Bearer ${token}` } : {}) },
     };
   }
   if (role === "SUPERUSER") {
     return {
       url: `${API_BASE}/api/admin/approveJobPost/${adminId}/${eid}/${jid}`,
       body: { admin_id: adminId, employee_id: eid, job_id: jid, status: "APPROVED" },
-      headers: {
-        "Content-Type": "application/json",
-        ...(token ? { Authorization: `Bearer ${token}` } : {}),
-      },
+      headers: { "Content-Type": "application/json", ...(token ? { Authorization: `Bearer ${token}` } : {}) },
     };
   }
   throw new Error("Your role/department is not allowed to approve this post.");
 };
 
-// Build endpoint + payload for REJECT (manager & superuser only)
 const buildRejectRequest = ({ role, dept, adminId, token, job }) => {
   const jid = job?.id || job?.job_id;
   const eid = job?.poster_id || job?.employee_id || getAuth().employeeId;
@@ -109,42 +98,37 @@ const buildRejectRequest = ({ role, dept, adminId, token, job }) => {
     return {
       url: `${API_BASE}/api/admin/departmentApprove/${adminId}/${eid}/${jid}`,
       body: { admin_id: adminId, employee_id: eid, job_id: jid, status: "REJECTED" },
-      headers: {
-        "Content-Type": "application/json",
-        ...(token ? { Authorization: `Bearer ${token}` } : {}),
-      },
+      headers: { "Content-Type": "application/json", ...(token ? { Authorization: `Bearer ${token}` } : {}) },
     };
   }
   if (role === "SUPERUSER") {
     return {
       url: `${API_BASE}/api/admin/approveJobPost/${adminId}/${eid}/${jid}`,
       body: { admin_id: adminId, employee_id: eid, job_id: jid, status: "REJECTED" },
-      headers: {
-        "Content-Type": "application/json",
-        ...(token ? { Authorization: `Bearer ${token}` } : {}),
-      },
+      headers: { "Content-Type": "application/json", ...(token ? { Authorization: `Bearer ${token}` } : {}) },
     };
   }
   throw new Error("This role cannot reject. Finance can only approve.");
 };
 
+// ================= COMPONENT =================
 const JobDetailModal = ({ job, onClose, onApprove, onReject }) => {
+  // Always call hooks (fixes React #310)
   const [submitting, setSubmitting] = useState(false);
   const [uiError, setUiError] = useState(null);
 
-  if (!job) return null;
+  const isOpen = !!job; // gate UI, not hooks
+  if (!isOpen) return null;
 
-  // ---------- Safe derivations ----------
+  // ---------- safe derivations ----------
   const title = job.title || "Untitled";
   const priorityLabel = (job.priority || "low").toString().toUpperCase();
   const department = job.department || "—";
   const type = job.type || job.employmentType || "—";
   const seniority = job.seniorityLevel || "—";
   const locationText =
-    job.locationType === "remote"
-      ? "Remote"
-      : job.locationType === "hybrid"
-      ? `Hybrid${job.city ? ` - ${job.city}` : ""}`
+    job.locationType === "remote" ? "Remote"
+      : job.locationType === "hybrid" ? `Hybrid${job.city ? ` - ${job.city}` : ""}`
       : job.city || job.office || "—";
   const submittedBy = job.submittedBy || "unknown";
   const submittedDate = job.submittedDate || job.createdAt || job.created_at || null;
@@ -152,7 +136,7 @@ const JobDetailModal = ({ job, onClose, onApprove, onReject }) => {
     ? new Date(submittedDate).toLocaleDateString("en-GB", { day: "numeric", month: "long", year: "numeric" })
     : "—";
 
-  // Salary display (handles multiple shapes)
+  // Salary display (supports multiple shapes)
   let salarySection = null;
   if (typeof job.salaryDisplay === "string") {
     salarySection = job.salaryDisplay;
@@ -178,18 +162,13 @@ const JobDetailModal = ({ job, onClose, onApprove, onReject }) => {
   const { adminRole, adminDept } = getAuth();
   const { departmentApproved, financeApproved } = extractStage(job);
 
-  const approveDisabled = useMemo(() => {
-    if (submitting) return true;
-    if (adminRole === "FINANCE" && !departmentApproved) return true; // wait for dept
-    if (adminRole === "SUPERUSER" && !financeApproved) return true; // wait for finance
-    return false;
-  }, [submitting, adminRole, departmentApproved, financeApproved]);
+  const approveDisabled =
+    submitting ||
+    (adminRole === "FINANCE" && !departmentApproved) ||
+    (adminRole === "SUPERUSER" && !financeApproved);
 
-  const rejectDisabled = useMemo(() => {
-    if (submitting) return true;
-    if (!canRejectForRole(adminRole)) return true;
-    return false;
-  }, [submitting, adminRole]);
+  const rejectDisabled =
+    submitting || !canRejectForRole(adminRole);
 
   const approveTitle =
     adminRole === "FINANCE" && !departmentApproved
