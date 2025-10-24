@@ -1,16 +1,14 @@
 "use client";
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 
 const API_BASE = "https://jellyfish-app-z83s2.ondigitalocean.app";
 
 const getAuth = () => {
-  const aid =
-    (typeof window !== "undefined" && sessionStorage.getItem("user_id")) ||
-    (typeof window !== "undefined" && localStorage.getItem("user_id")) || // your older fallback
-    null;
   const token =
     typeof window !== "undefined" ? sessionStorage.getItem("access_token") : null;
-  return { aid, token };
+  const sessionAid =
+    typeof window !== "undefined" ? sessionStorage.getItem("admin_id") : null;
+  return { token, sessionAid };
 };
 
 const headers = (token) => ({
@@ -31,12 +29,45 @@ const AddUserModal = ({ show, onClose, onAdd, activeTab, roleLabel }) => {
     position: "",
     status: "active",
   });
+
   const [submitting, setSubmitting] = useState(false);
   const [uiError, setUiError] = useState("");
+  const [admins, setAdmins] = useState([]);
+  const [selectedAid, setSelectedAid] = useState("");
+
+  // Load admins if we need an AID (admin or recruiter flows)
+  useEffect(() => {
+    const needAid = show && (activeTab === "admin" || activeTab === "recruiter");
+    if (!needAid) return;
+
+    const { sessionAid } = getAuth();
+    // If we already have a session AID, we don't need to fetch list (optional).
+    if (sessionAid) return;
+
+    (async () => {
+      try {
+        const res = await fetch(`${API_BASE}/api/admin/allAdmins`, {
+          headers: headers(getAuth().token),
+          cache: "no-store",
+        });
+        if (!res.ok) throw new Error(`Failed to fetch admins (${res.status})`);
+        const data = await res.json();
+        if (Array.isArray(data)) {
+          // keep only active admins for the performer list
+          setAdmins(data.filter((a) => a.is_active));
+        } else {
+          setAdmins([]);
+        }
+      } catch (e) {
+        console.error(e);
+        setAdmins([]);
+      }
+    })();
+  }, [show, activeTab]);
 
   const handleChange = (e) => {
     const { name, value } = e.target;
-    setFormData((prev) => ({ ...prev, [name]: value }));
+    setFormData((p) => ({ ...p, [name]: value }));
   };
 
   const resetForm = () => {
@@ -51,11 +82,12 @@ const AddUserModal = ({ show, onClose, onAdd, activeTab, roleLabel }) => {
       position: "",
       status: "active",
     });
+    setSelectedAid("");
+    setUiError("");
   };
 
   const handleClose = () => {
     resetForm();
-    setUiError("");
     onClose();
   };
 
@@ -68,12 +100,13 @@ const AddUserModal = ({ show, onClose, onAdd, activeTab, roleLabel }) => {
       formData.phoneNumber;
 
     if (activeTab === "admin") {
-      // Removed the incorrect `formData.aid` check
+      // need department/role/employeeNumber
       return (
         baseValid &&
         formData.employeeNumber &&
         formData.department &&
-        formData.role
+        formData.role &&
+        !!getEffectiveAid()
       );
     }
 
@@ -82,30 +115,36 @@ const AddUserModal = ({ show, onClose, onAdd, activeTab, roleLabel }) => {
     }
 
     if (activeTab === "recruiter") {
-      // HR member requires employee number at the backend
-      return baseValid && formData.department && formData.employeeNumber;
+      // backend requires hr_employee_number
+      return baseValid && formData.department && formData.employeeNumber && !!getEffectiveAid();
     }
 
-    // applicants don't use this modal in your flow
     return baseValid;
+  };
+
+  // Compute AID to use: prefer session admin_id; else selectedAid from dropdown
+  const getEffectiveAid = () => {
+    const { sessionAid } = getAuth();
+    return (sessionAid && sessionAid.trim()) || (selectedAid && selectedAid.trim()) || "";
   };
 
   const handleSubmit = async () => {
     setUiError("");
     setSubmitting(true);
-    const { aid, token } = getAuth();
 
     try {
+      const { token } = getAuth();
+      const aid = getEffectiveAid();
       if (!aid) {
         throw new Error(
-          "Missing admin ID (aid). Ensure sessionStorage.admin_id is set after login."
+          "Select the Admin performing this action. (No admin_id in session and none selected.)"
         );
       }
 
       let newUser = null;
 
       if (activeTab === "admin") {
-        // /api/admin/addNewAdmin/{aid}
+        // POST /api/admin/addNewAdmin/{aid}
         const url = `${API_BASE}/api/admin/addNewAdmin/${aid}`;
         const payload = {
           email: formData.email,
@@ -113,9 +152,9 @@ const AddUserModal = ({ show, onClose, onAdd, activeTab, roleLabel }) => {
           last_name: formData.lastName,
           employee_number: formData.employeeNumber,
           department: formData.department,
-          role: formData.role, // e.g., MANAGER, SUPERUSER, etc.
+          role: formData.role,
           phone_number: formData.phoneNumber,
-          aid, // API example shows this in body
+          aid, // API’s example shows aid in body too
         };
 
         const res = await fetch(url, {
@@ -126,19 +165,20 @@ const AddUserModal = ({ show, onClose, onAdd, activeTab, roleLabel }) => {
 
         if (!res.ok) {
           const text = await res.text();
+          // Show a friendly hint if backend says admin not found
+          if (text?.toLowerCase?.().includes("admin user does not exist")) {
+            throw new Error(
+              "Admin user does not exist. Pick a valid Admin in the selector or ensure sessionStorage.admin_id is set to an existing admin."
+            );
+          }
           throw new Error(text || `Add admin failed (${res.status})`);
         }
 
-        // If the API returns the created admin, parse it.
-        // If it returns a message only, synthesize a user object from form data:
         let data = null;
         try {
           data = await res.json();
-        } catch {
-          data = null;
-        }
+        } catch {}
 
-        // Map the response (or fallback to form data)
         const id =
           data?.admin_id ||
           data?.id ||
@@ -158,7 +198,7 @@ const AddUserModal = ({ show, onClose, onAdd, activeTab, roleLabel }) => {
           status: data?.is_active === false ? "inactive" : "active",
         };
       } else if (activeTab === "recruiter") {
-        // /api/admin/addHrMember/{aid}
+        // POST /api/admin/addHrMember/{aid}
         const url = `${API_BASE}/api/admin/addHrMember/${aid}`;
         const payload = {
           admin_id: aid,
@@ -176,15 +216,18 @@ const AddUserModal = ({ show, onClose, onAdd, activeTab, roleLabel }) => {
 
         if (!res.ok) {
           const text = await res.text();
+          if (text?.toLowerCase?.().includes("admin user does not exist")) {
+            throw new Error(
+              "Admin user does not exist. Choose a valid Admin in the dropdown or set sessionStorage.admin_id to an existing admin_id."
+            );
+          }
           throw new Error(text || `Add HR member failed (${res.status})`);
         }
 
         let data = null;
         try {
           data = await res.json();
-        } catch {
-          data = null;
-        }
+        } catch {}
 
         const id =
           data?.employee_id ||
@@ -199,23 +242,19 @@ const AddUserModal = ({ show, onClose, onAdd, activeTab, roleLabel }) => {
           firstName: data?.first_name ?? formData.firstName,
           lastName: data?.last_name ?? formData.lastName,
           email: data?.hr_email ?? formData.email,
-          department: formData.department, // endpoint doesn't include dept; keep from form
+          department: formData.department,
           role: "HR_RECRUITER",
           phone: formData.phoneNumber,
           status: "active",
         };
       } else if (activeTab === "employee") {
-        // You didn’t share an employee-create endpoint; let parent onAdd() handle the stub.
+        // No API shared for create employee; bubble up stub
         newUser = { ...formData, id: `tmp_${Date.now()}` };
       } else {
-        // applicants not created here
         newUser = { ...formData, id: `tmp_${Date.now()}` };
       }
 
-      // Hand result back to parent so it can insert into the correct list
       onAdd?.(newUser);
-
-      // Close + reset
       handleClose();
     } catch (e) {
       setUiError(e.message || "Failed to add user");
@@ -226,6 +265,8 @@ const AddUserModal = ({ show, onClose, onAdd, activeTab, roleLabel }) => {
 
   if (!show) return null;
 
+  const needAidSelector = (activeTab === "admin" || activeTab === "recruiter") && !getAuth().sessionAid;
+
   return (
     <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
       <div className="bg-white rounded-lg max-w-md w-full p-6">
@@ -234,6 +275,31 @@ const AddUserModal = ({ show, onClose, onAdd, activeTab, roleLabel }) => {
         </h3>
 
         <div className="space-y-4 max-h-[60vh] overflow-y-auto">
+          {/* If no session AID, let user pick which Admin is performing the action */}
+          {needAidSelector && (
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Admin performing this action *
+              </label>
+              <select
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:border-green-700 focus:ring-2 focus:ring-green-100"
+                value={selectedAid}
+                onChange={(e) => setSelectedAid(e.target.value)}
+              >
+                <option value="">Select an admin</option>
+                {admins.map((a) => (
+                  <option key={a.admin_id} value={a.admin_id}>
+                    {a.first_name} {a.last_name} — {a.email}
+                  </option>
+                ))}
+              </select>
+              <p className="text-xs text-gray-500 mt-1">
+                Tip: to skip this step in future, store{" "}
+                <code>sessionStorage.admin_id</code> after login.
+              </p>
+            </div>
+          )}
+
           {/* Names */}
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">
@@ -342,7 +408,7 @@ const AddUserModal = ({ show, onClose, onAdd, activeTab, roleLabel }) => {
             </div>
           )}
 
-          {/* Employee-only field */}
+          {/* Employee-only */}
           {activeTab === "employee" && (
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">
@@ -359,7 +425,7 @@ const AddUserModal = ({ show, onClose, onAdd, activeTab, roleLabel }) => {
             </div>
           )}
 
-          {/* HR-only field needed by backend */}
+          {/* HR-only: required by backend */}
           {activeTab === "recruiter" && (
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">
@@ -371,7 +437,7 @@ const AddUserModal = ({ show, onClose, onAdd, activeTab, roleLabel }) => {
                 value={formData.employeeNumber}
                 onChange={handleChange}
                 className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:border-green-700 focus:ring-2 focus:ring-green-100"
-                placeholder="EMP123"
+                placeholder="EMP800"
               />
             </div>
           )}
