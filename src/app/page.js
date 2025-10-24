@@ -1,7 +1,7 @@
-import AdminDashboard from "./components/Dashboard/DashboardPage";
+import LoginPage from "./login/Login";
 
 export default function Home() {
   return (
-    <AdminDashboard />
+    <LoginPage />
   );
 }
