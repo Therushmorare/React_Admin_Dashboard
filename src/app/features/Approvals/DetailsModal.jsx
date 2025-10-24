@@ -35,11 +35,43 @@ const safePriorityClasses = (priority) => {
 // --------- auth + stage helpers ----------
 const getAuth = () => {
   const token = typeof window !== "undefined" ? sessionStorage.getItem("access_token") : null;
-  const adminId = typeof window !== "undefined" ? sessionStorage.getItem("user_id") : null;
-  const adminRole = typeof window !== "undefined" ? sessionStorage.getItem("admin_role") : null; // MANAGER | FINANCE | SUPERUSER
-  const adminDept = typeof window !== "undefined" ? sessionStorage.getItem("admin_department") : null;
-  const employeeId = typeof window !== "undefined" ? sessionStorage.getItem("user_id") : null;
-  return { token, adminId, adminRole, adminDept, employeeId };
+
+  // IMPORTANT: adminId from admin_id (not user_id)
+  const adminIdRaw = typeof window !== "undefined" ? sessionStorage.getItem("admin_id") : null;
+
+  const rawRole = typeof window !== "undefined" ? sessionStorage.getItem("admin_role") : null;
+  const rawDept = typeof window !== "undefined" ? sessionStorage.getItem("admin_department") : null;
+
+  // employee_id (current user)
+  const employeeIdRaw = typeof window !== "undefined" ? sessionStorage.getItem("user_id") : null;
+
+  // Normalize role: trim, uppercase, drop optional ROLE_
+  const adminRole = (rawRole || "").trim().toUpperCase().replace(/^ROLE_/, "");
+
+  // Normalize dept: trim + lowercase
+  const adminDept = (rawDept || "").trim().toLowerCase();
+
+  return {
+    token,
+    adminId: (adminIdRaw || "").trim(),
+    adminRole,
+    adminDept,
+    employeeId: (employeeIdRaw || "").trim(),
+    rawRole,
+    rawDept,
+  };
+};
+
+// Accept common labels for the department approval step
+const isJobPostDept = (dept) => {
+  const d = (dept || "").toLowerCase().trim();
+  if (!d) return false;
+  if (d === "job post department") return true;
+  if (d === "job-post-department") return true;
+  if (d === "job posts" || d === "jobpost" || d === "job posts department") return true;
+  if (d === "hr" || d === "human resources") return true;
+  if (d.includes("job") && d.includes("post")) return true;
+  return false;
 };
 
 const extractStage = (job) => {
@@ -49,13 +81,18 @@ const extractStage = (job) => {
     job?.financeApproved ?? (job?.status?.toUpperCase?.() === "FINANCE_APPROVED");
   const superuserApproved =
     job?.superuserApproved ?? (job?.status?.toUpperCase?.() === "APPROVED");
-  return { departmentApproved: !!departmentApproved, financeApproved: !!financeApproved, superuserApproved: !!superuserApproved };
+  return {
+    departmentApproved: !!departmentApproved,
+    financeApproved: !!financeApproved,
+    superuserApproved: !!superuserApproved,
+  };
 };
 
 const roleApproveLabel = (role) =>
-  role === "MANAGER" ? "Approve (Department)" :
-  role === "FINANCE" ? "Approve (Finance)" :
-  role === "SUPERUSER" ? "Approve (Superuser)" : "Approve";
+  role === "MANAGER" ? "Approve (Department)"
+    : role === "FINANCE" ? "Approve (Finance)"
+    : role === "SUPERUSER" ? "Approve (Superuser)"
+    : "Approve";
 
 const canRejectForRole = (role) => role === "MANAGER" || role === "SUPERUSER";
 
@@ -65,13 +102,16 @@ const buildApproveRequest = ({ role, dept, adminId, token, job }) => {
   const eid = job?.poster_id || job?.employee_id || getAuth().employeeId;
   if (!adminId || !jid) throw new Error("Missing admin_id or job_id.");
 
-  if (role === "MANAGER" && (dept || "").toLowerCase() === "job post department") {
+  console.debug("[approve] role/dept/jid/eid:", { role, dept, jid, eid });
+
+  if (role === "MANAGER" && isJobPostDept(dept)) {
     return {
       url: `${API_BASE}/api/admin/departmentApprove/${adminId}/${eid}/${jid}`,
       body: { admin_id: adminId, employee_id: eid, job_id: jid, status: "APPROVED" },
       headers: { "Content-Type": "application/json", ...(token ? { Authorization: `Bearer ${token}` } : {}) },
     };
   }
+
   if (role === "FINANCE") {
     return {
       url: `${API_BASE}/api/admin/financeApproval/${adminId}/${jid}`,
@@ -79,6 +119,7 @@ const buildApproveRequest = ({ role, dept, adminId, token, job }) => {
       headers: { "Content-Type": "application/json", ...(token ? { Authorization: `Bearer ${token}` } : {}) },
     };
   }
+
   if (role === "SUPERUSER") {
     return {
       url: `${API_BASE}/api/admin/approveJobPost/${adminId}/${eid}/${jid}`,
@@ -86,6 +127,8 @@ const buildApproveRequest = ({ role, dept, adminId, token, job }) => {
       headers: { "Content-Type": "application/json", ...(token ? { Authorization: `Bearer ${token}` } : {}) },
     };
   }
+
+  console.warn("[approve] No role/department match", { role, dept });
   throw new Error("Your role/department is not allowed to approve this post.");
 };
 
@@ -94,13 +137,16 @@ const buildRejectRequest = ({ role, dept, adminId, token, job }) => {
   const eid = job?.poster_id || job?.employee_id || getAuth().employeeId;
   if (!adminId || !jid) throw new Error("Missing admin_id or job_id.");
 
-  if (role === "MANAGER" && (dept || "").toLowerCase() === "job post department") {
+  console.debug("[reject] role/dept/jid/eid:", { role, dept, jid, eid });
+
+  if (role === "MANAGER" && isJobPostDept(dept)) {
     return {
       url: `${API_BASE}/api/admin/departmentApprove/${adminId}/${eid}/${jid}`,
       body: { admin_id: adminId, employee_id: eid, job_id: jid, status: "REJECTED" },
       headers: { "Content-Type": "application/json", ...(token ? { Authorization: `Bearer ${token}` } : {}) },
     };
   }
+
   if (role === "SUPERUSER") {
     return {
       url: `${API_BASE}/api/admin/approveJobPost/${adminId}/${eid}/${jid}`,
@@ -108,12 +154,14 @@ const buildRejectRequest = ({ role, dept, adminId, token, job }) => {
       headers: { "Content-Type": "application/json", ...(token ? { Authorization: `Bearer ${token}` } : {}) },
     };
   }
+
+  console.warn("[reject] No role/department match", { role, dept });
   throw new Error("This role cannot reject. Finance can only approve.");
 };
 
 // ================= COMPONENT =================
 const JobDetailModal = ({ job, onClose, onApprove, onReject }) => {
-  // Always call hooks (fixes React #310)
+  // Always call hooks (fix React #310)
   const [submitting, setSubmitting] = useState(false);
   const [uiError, setUiError] = useState(null);
 
@@ -127,8 +175,10 @@ const JobDetailModal = ({ job, onClose, onApprove, onReject }) => {
   const type = job.type || job.employmentType || "—";
   const seniority = job.seniorityLevel || "—";
   const locationText =
-    job.locationType === "remote" ? "Remote"
-      : job.locationType === "hybrid" ? `Hybrid${job.city ? ` - ${job.city}` : ""}`
+    job.locationType === "remote"
+      ? "Remote"
+      : job.locationType === "hybrid"
+      ? `Hybrid${job.city ? ` - ${job.city}` : ""}`
       : job.city || job.office || "—";
   const submittedBy = job.submittedBy || "unknown";
   const submittedDate = job.submittedDate || job.createdAt || job.created_at || null;
@@ -167,8 +217,7 @@ const JobDetailModal = ({ job, onClose, onApprove, onReject }) => {
     (adminRole === "FINANCE" && !departmentApproved) ||
     (adminRole === "SUPERUSER" && !financeApproved);
 
-  const rejectDisabled =
-    submitting || !canRejectForRole(adminRole);
+  const rejectDisabled = submitting || !canRejectForRole(adminRole);
 
   const approveTitle =
     adminRole === "FINANCE" && !departmentApproved
@@ -182,9 +231,14 @@ const JobDetailModal = ({ job, onClose, onApprove, onReject }) => {
     setUiError(null);
     setSubmitting(true);
     try {
-      const { token, adminId, adminRole: role, adminDept: dept } = getAuth();
+      const { token, adminId, adminRole: role, adminDept: dept } = getAuth(); // normalized
       const req = buildApproveRequest({ role, dept, adminId, token, job });
-      const res = await fetch(req.url, { method: "POST", headers: req.headers, body: JSON.stringify(req.body) });
+      console.debug("[approve] POST", req.url, req.body);
+      const res = await fetch(req.url, {
+        method: "POST",
+        headers: req.headers,
+        body: JSON.stringify(req.body),
+      });
       if (!res.ok) {
         const text = await res.text();
         throw new Error(text || `Approve failed (${res.status})`);
@@ -202,9 +256,14 @@ const JobDetailModal = ({ job, onClose, onApprove, onReject }) => {
     setUiError(null);
     setSubmitting(true);
     try {
-      const { token, adminId, adminRole: role, adminDept: dept } = getAuth();
+      const { token, adminId, adminRole: role, adminDept: dept } = getAuth(); // normalized
       const req = buildRejectRequest({ role, dept, adminId, token, job });
-      const res = await fetch(req.url, { method: "POST", headers: req.headers, body: JSON.stringify(req.body) });
+      console.debug("[reject] POST", req.url, req.body);
+      const res = await fetch(req.url, {
+        method: "POST",
+        headers: req.headers,
+        body: JSON.stringify(req.body),
+      });
       if (!res.ok) {
         const text = await res.text();
         throw new Error(text || `Reject failed (${res.status})`);
@@ -331,7 +390,8 @@ const JobDetailModal = ({ job, onClose, onApprove, onReject }) => {
               <div className="space-y-3">
                 {customQuestions.map((question, idx) => {
                   const q = question?.question || "Untitled question";
-                  const required = question?.required === true || question?.required === "1" || question?.required === 1;
+                  const required =
+                    question?.required === true || question?.required === "1" || question?.required === 1;
                   const type = question?.type || "—";
                   return (
                     <div key={idx} className="bg-gray-50 rounded-lg p-4">
@@ -368,10 +428,10 @@ const JobDetailModal = ({ job, onClose, onApprove, onReject }) => {
 
           <button
             onClick={doReject}
-            disabled={rejectDisabled}
-            title={!canRejectForRole(adminRole) ? "This role cannot reject" : undefined}
+            disabled={submitting || !canRejectForRole(getAuth().adminRole)}
+            title={!canRejectForRole(getAuth().adminRole) ? "This role cannot reject" : undefined}
             className={`px-6 py-3 border rounded-lg transition-colors flex items-center ${
-              rejectDisabled
+              submitting || !canRejectForRole(getAuth().adminRole)
                 ? "border-red-200 text-red-300 cursor-not-allowed"
                 : "border-red-300 text-red-600 hover:bg-red-50"
             }`}
@@ -382,14 +442,28 @@ const JobDetailModal = ({ job, onClose, onApprove, onReject }) => {
 
           <button
             onClick={doApprove}
-            disabled={approveDisabled}
-            title={approveTitle}
+            disabled={
+              submitting ||
+              (getAuth().adminRole === "FINANCE" && !departmentApproved) ||
+              (getAuth().adminRole === "SUPERUSER" && !financeApproved)
+            }
+            title={
+              getAuth().adminRole === "FINANCE" && !departmentApproved
+                ? "Department must approve first"
+                : getAuth().adminRole === "SUPERUSER" && !financeApproved
+                ? "Finance must approve first"
+                : roleApproveLabel(getAuth().adminRole)
+            }
             className={`px-6 py-3 text-white rounded-lg transition-colors flex items-center ${
-              approveDisabled ? "bg-green-300 cursor-not-allowed" : "bg-green-700 hover:bg-green-800"
+              submitting ||
+              (getAuth().adminRole === "FINANCE" && !departmentApproved) ||
+              (getAuth().adminRole === "SUPERUSER" && !financeApproved)
+                ? "bg-green-300 cursor-not-allowed"
+                : "bg-green-700 hover:bg-green-800"
             }`}
           >
             <CheckCircle size={16} className="mr-2" />
-            {roleApproveLabel(adminRole)}
+            {roleApproveLabel(getAuth().adminRole)}
           </button>
         </div>
       </div>
