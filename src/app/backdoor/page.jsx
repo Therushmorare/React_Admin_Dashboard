@@ -25,7 +25,7 @@ export default function BackdoorAddAdminPage() {
   const postJSON = async (url, token, body) => {
     const res = await fetch(url, {
       method: "POST",
-      headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+      headers: { "Content-Type": "application/json" },
       body: JSON.stringify(body),
     });
     const text = await res.text().catch(() => "");
@@ -91,7 +91,6 @@ export default function BackdoorAddAdminPage() {
     if (!canSubmit) return;
     setIsSubmitting(true);
     try {
-      const { token } = getAuth();
       const payload = buildPayload();
 
       await postJSON(`${API_BASE}/api/admin/backdoorAdmnUzr`, token, payload);
