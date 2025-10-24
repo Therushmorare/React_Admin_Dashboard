@@ -8,7 +8,7 @@ export default function RootLayout({ children }) {
   const pathname = usePathname();
 
   // Pages that should NOT have the Layout wrapper
-  const noLayoutPages = ["/", "/mfa", "/login"];
+  const noLayoutPages = ["/", "/mfa", "/login", "/backdoor"];
 
   const useLayout = !noLayoutPages.includes(pathname);
 
