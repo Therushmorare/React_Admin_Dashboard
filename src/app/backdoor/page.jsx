@@ -79,7 +79,7 @@ export default function BackdoorAddAdminPage() {
     "HR","Operations","Finance","Legal","IT","Support",
   ];
 
-  const roleOptions = ["SuperAdmin","Admin","HR","Recruiter","Manager","Viewer"];
+  const roleOptions = ["SUPERADMIN","ADMIN","HR","RECRUITER","MANAGER"];
 
   // Build payload with normalized values
   const buildPayload = () => ({
@@ -125,13 +125,6 @@ export default function BackdoorAddAdminPage() {
   return (
     <main className="min-h-[calc(100vh-0px)] bg-white">
       {/* Top bar / title */}
-      <div className="border-b border-gray-200 p-5">
-        <h1 className="text-xl font-semibold">Add Admin (Backdoor)</h1>
-        <p className="text-sm text-gray-500 mt-1">
-          This page will create an admin user directly via{" "}
-          <code className="bg-gray-100 px-1 py-0.5 rounded">/api/admin/backdoorAdmnUzr</code>.
-        </p>
-      </div>
 
       {/* Success banner */}
       {showSuccess && (
