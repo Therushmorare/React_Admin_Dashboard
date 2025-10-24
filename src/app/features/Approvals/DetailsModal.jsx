@@ -35,7 +35,7 @@ const safePriorityClasses = (priority) => {
 // --------- auth + stage helpers ----------
 const getAuth = () => {
   const token = typeof window !== "undefined" ? sessionStorage.getItem("access_token") : null;
-  const adminId = typeof window !== "undefined" ? sessionStorage.getItem("admin_id") : null;
+  const adminId = typeof window !== "undefined" ? sessionStorage.getItem("user_id") : null;
   const adminRole = typeof window !== "undefined" ? sessionStorage.getItem("admin_role") : null; // MANAGER | FINANCE | SUPERUSER
   const adminDept = typeof window !== "undefined" ? sessionStorage.getItem("admin_department") : null;
   const employeeId = typeof window !== "undefined" ? sessionStorage.getItem("user_id") : null;
