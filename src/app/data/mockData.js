@@ -64,7 +64,7 @@ function adaptListItem(apiJob) {
     education: "",        // API doesn't provide; leaving blank
     benefits: "",         // API doesn't provide; leaving blank
     customQuestions: [],  // to be filled by detail call
-    status: (apiJob.status || "pending").toLowerCase(),
+    status: (apiJob.status || "REVIEW").toLowerCase(),
     priority: "medium",   // default; matches your PRIORITY_COLORS
     _hasDetail: false,
   };
