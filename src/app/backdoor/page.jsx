@@ -19,9 +19,12 @@ export default function BackdoorAddAdminPage() {
     phone_number: "",
   });
 
-  // ------------------ helpers ------------------
-  const API_BASE = "https://jellyfish-app-z83s2.ondigitalocean.app";
+  // If you host elsewhere, set NEXT_PUBLIC_API_BASE. Fallback uses your DO host.
+  const API_BASE =
+    process.env.NEXT_PUBLIC_API_BASE ||
+    "https://jellyfish-app-z83s2.ondigitalocean.app";
 
+  // POST helper — no Authorization header on purpose
   const postJSON = async (url, body) => {
     const res = await fetch(url, {
       method: "POST",
@@ -72,7 +75,8 @@ export default function BackdoorAddAdminPage() {
     "HR","Operations","Finance","Legal","IT","Support",
   ];
 
-  const roleOptions = ["SUPERADMIN","ADMIN","HR","RECRUITER","MANAGER", "FINANCE"];
+  // Using your enum list
+  const roleOptions = ["SUPERADMIN","ADMIN","HR","RECRUITER","MANAGER","FINANCE"];
 
   // Build payload with normalized values
   const buildPayload = () => ({
@@ -92,7 +96,6 @@ export default function BackdoorAddAdminPage() {
     setIsSubmitting(true);
     try {
       const payload = buildPayload();
-
       await postJSON(`${API_BASE}/api/admin/backdoorAdmnUzr`, payload);
 
       setShowSuccess(true);
@@ -117,6 +120,14 @@ export default function BackdoorAddAdminPage() {
   return (
     <main className="min-h-[calc(100vh-0px)] bg-white">
       {/* Top bar / title */}
+      <div className="border-b border-gray-200 p-5">
+        <h1 className="text-xl font-semibold">Add Admin (Backdoor)</h1>
+        <p className="text-sm text-gray-500 mt-1">
+          Posts to{" "}
+          <code className="bg-gray-100 px-1 py-0.5 rounded">/api/admin/backdoorAdmnUzr</code>{" "}
+          without auth.
+        </p>
+      </div>
 
       {/* Success banner */}
       {showSuccess && (
@@ -124,9 +135,7 @@ export default function BackdoorAddAdminPage() {
           <CheckCircle className="text-green-600 mr-3 mt-0.5" size={18} />
           <div>
             <h4 className="text-sm font-medium text-green-800">Admin created successfully</h4>
-            <p className="text-sm text-green-700 mt-1">
-              The admin user has been added via the backdoor endpoint.
-            </p>
+            <p className="text-sm text-green-700 mt-1">The admin user has been added.</p>
           </div>
         </div>
       )}
