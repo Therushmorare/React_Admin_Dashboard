@@ -9,16 +9,26 @@ import EmptyState from "../../features/Approvals/EmptyState";
 import JobDetailModal from "../../features/Approvals/DetailsModal";
 import { ApproveModal, RejectModal } from "../../features/Approvals/ConfirmationModals";
 
-// ------------------ helpers ------------------
+// ======================= Config =======================
 const API_BASE = "https://jellyfish-app-z83s2.ondigitalocean.app";
 
+// ======================= Utils ========================
+const toUpper = (s) => (s || "").toUpperCase();
+
 const derivePriority = (job) => {
-  // Heuristic priority based on salary/experience if present
   const sal = job?.filters?.[0]?.salary ?? 0;
   const exp = job?.filters?.[0]?.experience ?? 0;
-  if (sal >= 90000 || exp >= 7) return "high";
-  if (sal >= 60000 || exp >= 4) return "medium";
+  if (typeof sal === "number" && (sal >= 90000 || exp >= 7)) return "high";
+  if (typeof sal === "number" && (sal >= 60000 || exp >= 4)) return "medium";
   return "low";
+};
+
+// Always return a Money-like object so job.salary.currency never explodes
+const normalizeSalary = (filters) => {
+  const f0 = (filters && filters[0]) || {};
+  const amount =
+    typeof f0.salary === "number" && Number.isFinite(f0.salary) ? f0.salary : null; // null if not provided
+  return { amount, currency: "ZAR" };
 };
 
 const mapApiJobToCard = (j) => ({
@@ -26,7 +36,7 @@ const mapApiJobToCard = (j) => ({
   title: j.job_title || "Untitled",
   department: j.department || "—",
   office: j.office || "—",
-  status: j.status, // "REVIEW", etc.
+  status: j.status || "REVIEW",
   createdAt: j.created_at,
   employmentType: j.employment_type,
   expectedCandidates: j.expected_candidates,
@@ -34,22 +44,38 @@ const mapApiJobToCard = (j) => ({
   closingDate: j.closing_date,
   description: j.job_description,
   filters: j.filters || [],
+  salary: normalizeSalary(j.filters),
   priority: derivePriority(j),
-  submittedBy: j.poster_id?.slice(0, 8) ?? "unknown", // placeholder label
+  submittedBy: j.poster_id ? j.poster_id.slice(0, 8) : "unknown",
 });
 
+const formatMoney = (money) => {
+  if (!money || typeof money.amount !== "number") return "—";
+  const currency = money.currency || "ZAR";
+  try {
+    return new Intl.NumberFormat("en-ZA", { style: "currency", currency }).format(money.amount);
+  } catch {
+    return `${currency} ${Number(money.amount).toLocaleString("en-ZA")}`;
+  }
+};
+
+// ======================= Page =========================
 const JobApprovalsPage = () => {
   const [selectedFilter, setSelectedFilter] = useState("all");
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedJob, setSelectedJob] = useState(null);
+
   const [showApproveModal, setShowApproveModal] = useState(false);
   const [showRejectModal, setShowRejectModal] = useState(false);
   const [rejectionReason, setRejectionReason] = useState("");
+
   const [actioningJobId, setActioningJobId] = useState(null);
+
   const [pendingJobs, setPendingJobs] = useState([]);
   const [loading, setLoading] = useState(false);
   const [detailLoading, setDetailLoading] = useState(false);
   const [error, setError] = useState(null);
+
   const [stats, setStats] = useState({
     pending: 0,
     approved: 12,
@@ -57,7 +83,7 @@ const JobApprovalsPage = () => {
     avgApprovalTime: "2.5 days",
   });
 
-  // ------------------ API ------------------
+  // --------------- API: list ---------------
   const loadJobs = useCallback(async () => {
     setLoading(true);
     setError(null);
@@ -72,12 +98,17 @@ const JobApprovalsPage = () => {
       setPendingJobs(mapped);
       updateStats(mapped);
     } catch (e) {
-      setError(e.message || "Failed to load jobs");
+      setError(e?.message || "Failed to load jobs");
     } finally {
       setLoading(false);
     }
   }, []);
 
+  useEffect(() => {
+    loadJobs();
+  }, [loadJobs]);
+
+  // --------------- API: detail ---------------
   const fetchJobDetails = useCallback(async (jobId) => {
     if (!jobId) return;
     setDetailLoading(true);
@@ -88,51 +119,48 @@ const JobApprovalsPage = () => {
       });
       if (!res.ok) throw new Error(`Failed to load job details (${res.status})`);
       const data = await res.json();
-      // Merge detail into currently selected job shape
+
       const base = mapApiJobToCard(data);
       const detailed = {
         ...base,
-        requirements: data.requirements || [],
-        duties: data.duties || [],
-        documents: data.documents || [],
-        questions: data.questions || [],
+        requirements: Array.isArray(data.requirements) ? data.requirements : [],
+        duties: Array.isArray(data.duties) ? data.duties : [],
+        documents: Array.isArray(data.documents) ? data.documents : [],
+        questions: Array.isArray(data.questions) ? data.questions : [],
       };
       setSelectedJob(detailed);
-    } catch (e) {
-      // If details fail, still show whatever we have from list
-      setSelectedJob((prev) => prev); // no-op, keeps previous
+    } catch {
+      // keep whatever is already shown
     } finally {
       setDetailLoading(false);
     }
   }, []);
 
-  useEffect(() => {
-    loadJobs();
-  }, [loadJobs]);
-
+  // --------------- Stats ---------------
   const updateStats = (jobs) => {
-    const norm = (s) => (s || "").toUpperCase();
-    const pendingCount = jobs.filter((j) => norm(j.status) === "REVIEW").length;
-    const approvedCount = jobs.filter((j) => norm(j.status) === "APPROVED").length;
-    const rejectedCount = jobs.filter((j) => norm(j.status) === "REJECTED").length;
+    const pendingCount = jobs.filter((j) => toUpper(j.status) === "REVIEW").length;
+    const approvedCount = jobs.filter((j) => toUpper(j.status) === "APPROVED").length;
+    const rejectedCount = jobs.filter((j) => toUpper(j.status) === "REJECTED").length;
 
     setStats((prev) => ({
       ...prev,
       pending: pendingCount,
-      approved: Math.max(prev.approved, approvedCount), // keep non-negative
+      approved: Math.max(prev.approved, approvedCount),
       rejected: Math.max(prev.rejected, rejectedCount),
     }));
   };
 
-  // ------------------ Approve / Reject ------------------
+  // --------------- Approve / Reject ---------------
   const handleApprove = (jobId) => {
     setActioningJobId(jobId);
     setShowApproveModal(true);
   };
 
   const confirmApprove = async () => {
-    // TODO: call your real Approve endpoint here
-    // await fetch(`${API_BASE}/api/approvals/approve/${actioningJobId}`, { method: "POST", ... })
+    if (!actioningJobId) return;
+
+    // TODO: Replace with your real API call
+    // await fetch(`${API_BASE}/api/approvals/approve/${actioningJobId}`, { method: "POST" });
 
     const updatedJobs = pendingJobs.map((job) =>
       job.id === actioningJobId ? { ...job, status: "APPROVED" } : job
@@ -151,13 +179,19 @@ const JobApprovalsPage = () => {
   };
 
   const confirmReject = async () => {
-    if (!rejectionReason.trim()) return;
+    if (!actioningJobId || !rejectionReason.trim()) return;
 
-    // TODO: call your real Reject endpoint here with reason
-    // await fetch(`${API_BASE}/api/approvals/reject/${actioningJobId}`, { method: "POST", body: JSON.stringify({ reason: rejectionReason }), ... })
+    // TODO: Replace with your real API call (include reason)
+    // await fetch(`${API_BASE}/api/approvals/reject/${actioningJobId}`, {
+    //   method: "POST",
+    //   headers: { "Content-Type": "application/json" },
+    //   body: JSON.stringify({ reason: rejectionReason }),
+    // });
 
     const updatedJobs = pendingJobs.map((job) =>
-      job.id === actioningJobId ? { ...job, status: "REJECTED", rejectionReason } : job
+      job.id === actioningJobId
+        ? { ...job, status: "REJECTED", rejectionReason }
+        : job
     );
     setPendingJobs(updatedJobs);
     updateStats(updatedJobs);
@@ -179,33 +213,27 @@ const JobApprovalsPage = () => {
     setRejectionReason("");
   };
 
-  // ------------------ Filters / Search ------------------
+  // --------------- Filters / Search ---------------
   const filteredJobs = useMemo(() => {
     const norm = (s) => (s || "").toLowerCase();
     return pendingJobs
-      // Treat API "REVIEW" as your "pending"
-      .filter((job) => (job.status || "").toUpperCase() === "REVIEW")
-      .filter((job) => {
-        if (selectedFilter === "all") return true;
-        return job.priority === selectedFilter;
-      })
+      .filter((job) => toUpper(job.status) === "REVIEW") // pending
+      .filter((job) => (selectedFilter === "all" ? true : job.priority === selectedFilter))
       .filter((job) => {
         if (!searchQuery) return true;
         return (
           norm(job.title).includes(norm(searchQuery)) ||
           norm(job.department).includes(norm(searchQuery)) ||
-          norm(job.submittedBy).includes(norm(searchQuery)) ||
+          norm(job.submittedBy || "").includes(norm(searchQuery)) ||
           norm(job.office).includes(norm(searchQuery))
         );
       });
   }, [pendingJobs, selectedFilter, searchQuery]);
 
-  // When user clicks a card's "View details"
+  // --------------- Card actions ---------------
   const onViewDetails = async (jobCard) => {
-    // show quick data immediately
-    setSelectedJob(jobCard);
-    // then load full details
-    await fetchJobDetails(jobCard.id);
+    setSelectedJob(jobCard); // show immediately
+    await fetchJobDetails(jobCard.id); // then hydrate
   };
 
   return (
@@ -216,20 +244,14 @@ const JobApprovalsPage = () => {
           <div className="flex justify-between items-center">
             <div>
               <h1 className="text-3xl font-bold text-gray-900">Job Post Approvals</h1>
-              <p className="text-gray-600 mt-1">
-                Review and approve pending job postings
-              </p>
+              <p className="text-gray-600 mt-1">Review and approve pending job postings</p>
             </div>
             <div className="flex items-center space-x-2 text-sm text-gray-600">
               <Clock size={16} />
               <span>Avg. approval time: {stats.avgApprovalTime}</span>
             </div>
           </div>
-          {error && (
-            <div className="mt-3 text-sm text-red-600">
-              {error}
-            </div>
-          )}
+          {error && <div className="mt-3 text-sm text-red-600">{error}</div>}
         </div>
       </div>
 
@@ -253,8 +275,12 @@ const JobApprovalsPage = () => {
             {filteredJobs.map((job) => (
               <JobCard
                 key={job.id}
-                job={job}
-                onViewDetails={onViewDetails}
+                job={{
+                  ...job,
+                  // If JobCard prints salary directly, pass a preformatted string:
+                  salaryDisplay: formatMoney(job.salary),
+                }}
+                onViewDetails={() => onViewDetails(job)}
                 onApprove={() => handleApprove(job.id)}
                 onReject={() => handleReject(job.id)}
               />
@@ -267,19 +293,19 @@ const JobApprovalsPage = () => {
 
       {/* Job Detail Modal */}
       <JobDetailModal
-        job={selectedJob}
+        job={
+          selectedJob
+            ? { ...selectedJob, salaryDisplay: formatMoney(selectedJob.salary) }
+            : null
+        }
         loading={detailLoading}
         onClose={() => setSelectedJob(null)}
-        onApprove={(jobId) => handleApprove(jobId || selectedJob?.id)}
-        onReject={(jobId) => handleReject(jobId || selectedJob?.id)}
+        onApprove={(jobId) => handleApprove(jobId || (selectedJob && selectedJob.id))}
+        onReject={(jobId) => handleReject(jobId || (selectedJob && selectedJob.id))}
       />
 
       {/* Approve Confirmation Modal */}
-      <ApproveModal
-        show={showApproveModal}
-        onConfirm={confirmApprove}
-        onCancel={cancelApprove}
-      />
+      <ApproveModal show={showApproveModal} onConfirm={confirmApprove} onCancel={cancelApprove} />
 
       {/* Reject Modal */}
       <RejectModal
