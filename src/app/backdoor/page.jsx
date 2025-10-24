@@ -22,13 +22,6 @@ export default function BackdoorAddAdminPage() {
   // ------------------ helpers ------------------
   const API_BASE = "https://jellyfish-app-z83s2.ondigitalocean.app";
 
-  const getAuth = () => {
-    const token =
-      typeof window !== "undefined" ? sessionStorage.getItem("access_token") : null;
-    if (!token) throw new Error("Missing access_token in sessionStorage");
-    return { token };
-  };
-
   const postJSON = async (url, token, body) => {
     const res = await fetch(url, {
       method: "POST",
@@ -79,7 +72,7 @@ export default function BackdoorAddAdminPage() {
     "HR","Operations","Finance","Legal","IT","Support",
   ];
 
-  const roleOptions = ["SUPERADMIN","ADMIN","HR","RECRUITER","MANAGER"];
+  const roleOptions = ["SUPERADMIN","ADMIN","HR","RECRUITER","MANAGER", "FINANCE"];
 
   // Build payload with normalized values
   const buildPayload = () => ({
