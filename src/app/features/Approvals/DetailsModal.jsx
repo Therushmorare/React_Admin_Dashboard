@@ -99,7 +99,7 @@ const canRejectForRole = (role) => role === "MANAGER" || role === "SUPERUSER";
 // --------- API builders ----------
 const buildApproveRequest = ({ role, dept, adminId, token, job }) => {
   const jid = job?.id || job?.job_id;
-  const eid = job?.poster_id || job?.employee_id || getAuth().employeeId;
+  const eid = job?.poster_id;
   if (!adminId || !jid) throw new Error("Missing admin_id or job_id.");
 
   console.debug("[approve] role/dept/jid/eid:", { role, dept, jid, eid });
