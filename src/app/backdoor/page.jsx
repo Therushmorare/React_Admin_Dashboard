@@ -22,7 +22,7 @@ export default function BackdoorAddAdminPage() {
   // ------------------ helpers ------------------
   const API_BASE = "https://jellyfish-app-z83s2.ondigitalocean.app";
 
-  const postJSON = async (url, token, body) => {
+  const postJSON = async (url, body) => {
     const res = await fetch(url, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
