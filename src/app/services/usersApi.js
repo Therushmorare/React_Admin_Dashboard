@@ -13,22 +13,20 @@ const getAuthHeaders = () => {
 
 // --- helpers ---
 const normalizeRole = (raw) => {
-  if (!raw) return "ADMIN";
+  if (!raw) return "USER";
   const r = String(raw).trim().toUpperCase().replace(/^ROLE_/, "");
   if (r === "SUPERUSER" || r === "SUPER_USER") return "SUPERUSER";
   if (r === "MANAGER") return "MANAGER";
   if (r === "FINANCE") return "FINANCE";
-  return r; // fallback
+  if (r === "HR" || r === "RECRUITER") return "HR_RECRUITER";
+  return r;
 };
 
-const normalizeDept = (raw) => {
-  // API sometimes sends 'departmet'
-  return (raw || "").toString().trim();
-};
+const normalizeDept = (raw) => (raw || "").toString().trim();
 
-// --- mappers (shape -> UI) ---
+// --- mappers ---
 const mapAdmin = (a) => ({
-  id: a.admin_id,                      // unify to id
+  id: a.admin_id,
   adminId: a.admin_id,
   firstName: a.first_name || "",
   lastName: a.last_name || "",
@@ -40,20 +38,40 @@ const mapAdmin = (a) => ({
 });
 
 const mapHR = (h) => ({
-  id: h.employee_id,                   // unify to id
+  id: h.employee_id,
   employeeId: h.employee_id,
   firstName: h.first_name || "",
   lastName: h.last_name || "",
   email: h.email || "",
-  department: normalizeDept(h.departmet || h.department || ""), // <-- fixed (was a.department)
+  department: normalizeDept(h.departmet || h.department || ""),
   role: normalizeRole(h.role || "RECRUITER"),
   phone: h.phone_number || "",
   status: h.is_active ? "active" : "inactive",
 });
 
+const mapApplicant = (a) => ({
+  id: a.applicant_id,
+  applicantId: a.applicant_id,
+  jobId: a.job_id,
+  applicationCode: a.application_code,
+  status: a.application_status || "APPLIED",
+  appliedAt: a.applied_at ? new Date(a.applied_at).toLocaleString("en-GB") : null,
+  firstName: a.first_name || "",
+  lastName: a.last_name || "",
+  email: a.email || "",
+  phone: a.phone_number || "",
+  idNumber: a.ID_Number || "",
+  dob: a.date_of_birth || "",
+  address: a.physical_address || "",
+  city: a.city || "",
+  province: a.province || "",
+  nationality: a.nationality || "",
+  professionalSummary: a.professional_summary || "",
+});
+
 // --- API ---
 export const UserAPI = {
-  // Admins
+  // ---------- ADMINS ----------
   async getAdminUsers() {
     const res = await fetch(`${API_BASE}/api/admin/allAdmins`, {
       headers: getAuthHeaders(),
@@ -65,63 +83,66 @@ export const UserAPI = {
   },
 
   async updateAdminUser(id, payload) {
-    // TODO: replace with real endpoint when available
-    return { ...payload, id };
+    return { ...payload, id }; // stub
   },
 
   async deleteAdminUser(id) {
-    // TODO: replace with real endpoint when available
-    return true;
+    return true; // stub
   },
 
-  // HR / Recruiters
+  // ---------- HR / RECRUITERS ----------
   async getRecruiterUsers() {
     const res = await fetch(`${API_BASE}/api/hr/allHRMembers`, {
       headers: getAuthHeaders(),
       cache: "no-store",
     });
-    if (!res.ok) throw new Error(`Failed to fetch hr members (${res.status})`);
+    if (!res.ok) throw new Error(`Failed to fetch HR members (${res.status})`);
     const data = await res.json();
     return Array.isArray(data) ? data.map(mapHR) : [];
   },
 
   async createRecruiterUser(payload) {
-    // TODO: replace with real POST
-    const id = (typeof crypto !== "undefined" && crypto.randomUUID) ? crypto.randomUUID() : `tmp_${Date.now()}`;
+    const id =
+      typeof crypto !== "undefined" && crypto.randomUUID
+        ? crypto.randomUUID()
+        : `tmp_${Date.now()}`;
     return { id, ...payload, status: "active" };
   },
 
   async deleteRecruiterUser(id) {
-    // TODO: replace with real DELETE
     return true;
   },
 
-  // Employees
+  // ---------- EMPLOYEES ----------
   async getEmployeeUsers() {
-    // TODO: swap to real endpoint when you have it
-    return [];
+    return []; // replace when endpoint ready
   },
 
   async createEmployeeUser(payload) {
-    // TODO: real POST
-    const id = (typeof crypto !== "undefined" && crypto.randomUUID) ? crypto.randomUUID() : `tmp_${Date.now()}`;
+    const id =
+      typeof crypto !== "undefined" && crypto.randomUUID
+        ? crypto.randomUUID()
+        : `tmp_${Date.now()}`;
     return { id, ...payload, status: "active" };
   },
 
   async updateEmployeeUser(id, payload) {
-    // TODO: real PATCH/PUT
     return { ...payload, id };
   },
 
   async deleteEmployeeUser(id) {
-    // TODO: real DELETE
     return true;
   },
 
-  // Applicants
+  // ---------- APPLICANTS ----------
   async getApplicantUsers() {
-    // TODO: real GET
-    return [];
+    const res = await fetch(`${API_BASE}/api/hr/all_applicants`, {
+      headers: getAuthHeaders(),
+      cache: "no-store",
+    });
+    if (!res.ok) throw new Error(`Failed to fetch applicants (${res.status})`);
+    const data = await res.json();
+    return Array.isArray(data) ? data.map(mapApplicant) : [];
   },
 
   async deleteApplicantUser(id) {
@@ -129,14 +150,12 @@ export const UserAPI = {
     return true;
   },
 
-  // Common
+  // ---------- COMMON ----------
   async toggleUserStatus(id, newStatus) {
-    // TODO: real PATCH; for now just echo
     return { id, status: newStatus };
   },
 
   async updateUserPermissions(id, permissions) {
-    // TODO: real PATCH; for now just echo
     return { id, permissions };
   },
 };
