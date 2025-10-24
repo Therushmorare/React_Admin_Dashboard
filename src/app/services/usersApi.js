@@ -24,6 +24,19 @@ const mapAdmin = (a) => ({
   status: a.is_active ? "active" : "inactive",
 });
 
+const mapHR = (h) => ({
+  id: h.employee_id,                                   // unify to id
+  employeeId: h.employee_id,
+  firstName: h.first_name || "",
+  lastName: h.last_name || "",
+  email: h.email || "",
+  department: h.departmet || a.department || "",    // API misspells "department" as "departmet"
+  role: normalizeRole(h.role),
+  phone: h.phone_number || "",
+  status: h.is_active ? "active" : "inactive",
+});
+
+
 // --- API ---
 export const UserAPI = {
   // Admins
@@ -51,7 +64,15 @@ export const UserAPI = {
   // Recruiters
   async getRecruiterUsers() {
     // TODO: swap to real endpoint when you have it
-    return [];
+    const res = await fetch(`${API_BASE}/api/hr/allHRMembers`, {
+      headers: { accept: "application/json" },
+      cache: "no-store",
+    });
+    if (!res.ok) throw new Error(`Failed to fetch admins (${res.status})`);
+    const data = await res.json();
+    if (!Array.isArray(data)) return [];
+    return data.map(mapHR);
+
   },
   async createRecruiterUser(payload) {
     // TODO: real POST
