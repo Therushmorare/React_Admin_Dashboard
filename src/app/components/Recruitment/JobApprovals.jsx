@@ -39,7 +39,7 @@ const JobApprovalsPage = () => {
   const updateStats = (jobs) => {
     setStats(prev => ({
       ...prev,
-      pending: jobs.filter(job => job.status === 'pending').length
+      pending: jobs.filter(job => job.status === 'REVIEW').length
     }));
   };
 
