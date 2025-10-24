@@ -1,24 +1,23 @@
-"use client"
+"use client";
 
-
-import React, { useState, useEffect } from 'react';
-import { Plus, Shield, Briefcase, Users as UsersIcon, FileText } from 'lucide-react';
-import { UserAPI } from '../../services/usersApi';
-import TabNavigation from './TabNavigation';
-import SearchBar from './SearchBar';
-import UserTable from './UserTable';
-import AddUserModal from '../../features/Users/AddUserModal';
-import EditUserModal from '../../features/Users/EditUserModal';
-import DeleteConfirmModal from '../../features/Users/DeleteModal';
-import UserDetailsModal from '../../features/Users/Details';
-import PermissionsModal from '../../features/Users/Permissions';
+import React, { useState, useEffect } from "react";
+import { Plus, Shield, Briefcase, Users as UsersIcon, FileText } from "lucide-react";
+import { UserAPI } from "../../services/usersApi";
+import TabNavigation from "./TabNavigation";
+import SearchBar from "./SearchBar";
+import UserTable from "./UserTable";
+import AddUserModal from "../../features/Users/AddUserModal";
+import EditUserModal from "../../features/Users/EditUserModal";
+import DeleteConfirmModal from "../../features/Users/DeleteModal";
+import UserDetailsModal from "../../features/Users/Details";
+import PermissionsModal from "../../features/Users/Permissions";
 
 const UsersPage = () => {
-  const [activeTab, setActiveTab] = useState('admin');
-  const [searchQuery, setSearchQuery] = useState('');
+  const [activeTab, setActiveTab] = useState("admin");
+  const [searchQuery, setSearchQuery] = useState("");
   const [loading, setLoading] = useState(false);
-  
-  // Modal states
+
+  // Modals
   const [showAddUser, setShowAddUser] = useState(false);
   const [showEditUser, setShowEditUser] = useState(false);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
@@ -26,227 +25,251 @@ const UsersPage = () => {
   const [showPermissions, setShowPermissions] = useState(false);
   const [selectedUser, setSelectedUser] = useState(null);
 
-  // User data states
+  // Data
   const [adminUsers, setAdminUsers] = useState([]);
   const [recruiterUsers, setRecruiterUsers] = useState([]);
   const [employeeUsers, setEmployeeUsers] = useState([]);
   const [applicantUsers, setApplicantUsers] = useState([]);
 
-    useEffect(() => {
-    // Check if admin ID exists, if not set a temporary one
-    if (!localStorage.getItem('adminId')) {
-      localStorage.setItem('adminId', '1'); // Use a valid admin ID from your database
-      console.log('✅ Temporary admin ID set to 1');
+  useEffect(() => {
+    // If you need an adminId locally for other actions
+    if (!localStorage.getItem("adminId")) {
+      localStorage.setItem("adminId", "1");
+      console.log("✅ Temporary admin ID set to 1");
     }
   }, []);
 
-  // Tab configuration
   const tabs = [
-    { id: 'admin', label: 'Admin Users', icon: Shield, color: 'red', count: adminUsers.length },
-    { id: 'recruiter', label: 'HR Recruiters', icon: Briefcase, color: 'blue', count: recruiterUsers.length },
-    { id: 'employee', label: 'Employees', icon: UsersIcon, color: 'green', count: employeeUsers.length },
-    { id: 'applicant', label: 'Applicants', icon: FileText, color: 'purple', count: applicantUsers.length }
+    { id: "admin", label: "Admin Users", icon: Shield, color: "red", count: adminUsers.length },
+    { id: "recruiter", label: "HR Recruiters", icon: Briefcase, color: "blue", count: recruiterUsers.length },
+    { id: "employee", label: "Employees", icon: UsersIcon, color: "green", count: employeeUsers.length },
+    { id: "applicant", label: "Applicants", icon: FileText, color: "purple", count: applicantUsers.length },
   ];
 
   useEffect(() => {
     loadUsers();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeTab]);
-  
+
   const loadUsers = async () => {
     setLoading(true);
     try {
-      switch(activeTab) {
-        //case 'admin':
-          //const admins = await UserAPI.getAdminUsers();
-          //setAdminUsers(admins);
-          //break;
-        case 'recruiter':
+      switch (activeTab) {
+        case "admin": {
+          const admins = await UserAPI.getAdminUsers();
+          setAdminUsers(admins);
+          break;
+        }
+        case "recruiter": {
           const recruiters = await UserAPI.getRecruiterUsers();
           setRecruiterUsers(recruiters);
           break;
-        case 'employee':
+        }
+        case "employee": {
           const employees = await UserAPI.getEmployeeUsers();
           setEmployeeUsers(employees);
           break;
-        case 'applicant':
+        }
+        case "applicant": {
           const applicants = await UserAPI.getApplicantUsers();
           setApplicantUsers(applicants);
           break;
+        }
+        default:
+          break;
       }
     } catch (error) {
-      console.error('Error loading users:', error);
+      console.error("Error loading users:", error);
     } finally {
       setLoading(false);
     }
   };
 
-
   const handleAddUser = async (userData) => {
     try {
       let newUser;
-      
-      switch(activeTab) {
-        /*case 'admin':
-          newUser = await UserAPI.createAdminUser(userData);
-          setAdminUsers(prev => [...prev, newUser]);
-          break;
-          */
-        case 'recruiter':
+      switch (activeTab) {
+        case "recruiter":
           newUser = await UserAPI.createRecruiterUser(userData);
-          setRecruiterUsers(prev => [...prev, newUser]);
+          setRecruiterUsers((prev) => [...prev, newUser]);
           break;
-        case 'employee':
+        case "employee":
           newUser = await UserAPI.createEmployeeUser(userData);
-          setEmployeeUsers(prev => [...prev, newUser]);
+          setEmployeeUsers((prev) => [...prev, newUser]);
           break;
-        case 'applicant':
+        case "admin":
+        case "applicant":
+        default:
+          // Implement when APIs are ready
           break;
       }
-
-      console.log('User created successfully:', newUser);
+      if (newUser) console.log("User created successfully:", newUser);
     } catch (error) {
-      console.error('Error creating user:', error);
+      console.error("Error creating user:", error);
     }
   };
 
   const handleEditUser = async (updatedUser) => {
     try {
-      let result;
-      
-      switch(activeTab) {
-        case 'admin':
+      let result = updatedUser;
+
+      switch (activeTab) {
+        case "admin": {
+          // Example uses stubbed API that echoes the payload back
           result = await UserAPI.updateAdminUser(updatedUser.id, updatedUser);
-          setAdminUsers(prev => prev.map(u => u.id === updatedUser.id ? result : u));
+          setAdminUsers((prev) => prev.map((u) => (u.id === updatedUser.id ? result : u)));
           break;
-        case 'recruiter':
-          setRecruiterUsers(prev => prev.map(u => u.id === updatedUser.id ? updatedUser : u));
+        }
+        case "recruiter": {
+          setRecruiterUsers((prev) => prev.map((u) => (u.id === updatedUser.id ? updatedUser : u)));
           break;
-        case 'employee':
+        }
+        case "employee": {
           result = await UserAPI.updateEmployeeUser(updatedUser.id, updatedUser);
-          setEmployeeUsers(prev => prev.map(u => u.id === updatedUser.id ? result : u));
+          setEmployeeUsers((prev) => prev.map((u) => (u.id === updatedUser.id ? result : u)));
           break;
-        case 'applicant':
-          setApplicantUsers(prev => prev.map(u => u.id === updatedUser.id ? updatedUser : u));
+        }
+        case "applicant": {
+          setApplicantUsers((prev) => prev.map((u) => (u.id === updatedUser.id ? updatedUser : u)));
+          break;
+        }
+        default:
           break;
       }
 
-      console.log('User updated successfully:', result);
+      console.log("User updated successfully:", result);
     } catch (error) {
-      console.error('Error updating user:', error);
+      console.error("Error updating user:", error);
     }
   };
 
   const handleDeleteUser = async (userId) => {
     try {
-      switch(activeTab) {
-        case 'admin':
+      switch (activeTab) {
+        case "admin":
           await UserAPI.deleteAdminUser(userId);
-          setAdminUsers(prev => prev.filter(u => u.id !== userId));
+          setAdminUsers((prev) => prev.filter((u) => u.id !== userId));
           break;
-        case 'recruiter':
+        case "recruiter":
           await UserAPI.deleteRecruiterUser(userId);
-          setRecruiterUsers(prev => prev.filter(u => u.id !== userId));
+          setRecruiterUsers((prev) => prev.filter((u) => u.id !== userId));
           break;
-        case 'employee':
+        case "employee":
           await UserAPI.deleteEmployeeUser(userId);
-          setEmployeeUsers(prev => prev.filter(u => u.id !== userId));
+          setEmployeeUsers((prev) => prev.filter((u) => u.id !== userId));
           break;
-        case 'applicant':
+        case "applicant":
           await UserAPI.deleteApplicantUser(userId);
-          setApplicantUsers(prev => prev.filter(u => u.id !== userId));
+          setApplicantUsers((prev) => prev.filter((u) => u.id !== userId));
+          break;
+        default:
           break;
       }
 
-      console.log('User deleted successfully');
+      console.log("User deleted successfully");
     } catch (error) {
-      console.error('Error deleting user:', error);
+      console.error("Error deleting user:", error);
     }
   };
 
   const handleToggleStatus = async (userId) => {
     try {
       const users = getCurrentUsers();
-      const user = users.find(u => u.id === userId);
-      const newStatus = user.status === 'active' ? 'inactive' : 'active';
+      const user = users.find((u) => u.id === userId);
+      const newStatus = user?.status === "active" ? "inactive" : "active";
 
       await UserAPI.toggleUserStatus(userId, newStatus);
-      
-      switch(activeTab) {
-        case 'admin':
-          setAdminUsers(prev => prev.map(u => u.id === userId ? { ...u, status: newStatus } : u));
+
+      switch (activeTab) {
+        case "admin":
+          setAdminUsers((prev) => prev.map((u) => (u.id === userId ? { ...u, status: newStatus } : u)));
           break;
-        case 'recruiter':
-          setRecruiterUsers(prev => prev.map(u => u.id === userId ? { ...u, status: newStatus } : u));
+        case "recruiter":
+          setRecruiterUsers((prev) => prev.map((u) => (u.id === userId ? { ...u, status: newStatus } : u)));
           break;
-        case 'employee':
-          setEmployeeUsers(prev => prev.map(u => u.id === userId ? { ...u, status: newStatus } : u));
+        case "employee":
+          setEmployeeUsers((prev) => prev.map((u) => (u.id === userId ? { ...u, status: newStatus } : u)));
           break;
-        case 'applicant':
-          setApplicantUsers(prev => prev.map(u => u.id === userId ? { ...u, status: newStatus } : u));
+        case "applicant":
+          setApplicantUsers((prev) => prev.map((u) => (u.id === userId ? { ...u, status: newStatus } : u)));
+          break;
+        default:
           break;
       }
 
-      console.log('User status updated successfully');
+      console.log("User status updated successfully");
     } catch (error) {
-      console.error('Error toggling user status:', error);
+      console.error("Error toggling user status:", error);
     }
   };
 
   const handleSavePermissions = async (updatedUser) => {
     try {
       await UserAPI.updateUserPermissions(updatedUser.id, updatedUser.permissions);
-      
-      switch(activeTab) {
-        case 'admin':
-          setAdminUsers(prev => prev.map(u => u.id === updatedUser.id ? updatedUser : u));
+
+      switch (activeTab) {
+        case "admin":
+          setAdminUsers((prev) => prev.map((u) => (u.id === updatedUser.id ? updatedUser : u)));
           break;
-        case 'recruiter':
-          setRecruiterUsers(prev => prev.map(u => u.id === updatedUser.id ? updatedUser : u));
+        case "recruiter":
+          setRecruiterUsers((prev) => prev.map((u) => (u.id === updatedUser.id ? updatedUser : u)));
           break;
-        case 'employee':
-          setEmployeeUsers(prev => prev.map(u => u.id === updatedUser.id ? updatedUser : u));
+        case "employee":
+          setEmployeeUsers((prev) => prev.map((u) => (u.id === updatedUser.id ? updatedUser : u)));
           break;
-        case 'applicant':
-          setApplicantUsers(prev => prev.map(u => u.id === updatedUser.id ? updatedUser : u));
+        case "applicant":
+          setApplicantUsers((prev) => prev.map((u) => (u.id === updatedUser.id ? updatedUser : u)));
+          break;
+        default:
           break;
       }
 
-      console.log('Permissions updated successfully');
+      console.log("Permissions updated successfully");
     } catch (error) {
-      console.error('Error updating permissions:', error);
+      console.error("Error updating permissions:", error);
     }
   };
-  
+
   const getCurrentUsers = () => {
-    switch(activeTab) {
-      case 'admin': return adminUsers;
-      case 'recruiter': return recruiterUsers;
-      case 'employee': return employeeUsers;
-      case 'applicant': return applicantUsers;
-      default: return [];
+    switch (activeTab) {
+      case "admin":
+        return adminUsers;
+      case "recruiter":
+        return recruiterUsers;
+      case "employee":
+        return employeeUsers;
+      case "applicant":
+        return applicantUsers;
+      default:
+        return [];
     }
   };
 
   const getRoleLabel = () => {
     const labels = {
-      'admin': 'Admin',
-      'recruiter': 'HR Recruiter',
-      'employee': 'Employee',
-      'applicant': 'Applicant'
+      admin: "Admin",
+      recruiter: "HR Recruiter",
+      employee: "Employee",
+      applicant: "Applicant",
     };
     return labels[activeTab];
   };
 
-  const filteredUsers = getCurrentUsers().filter(user => {
-    const fullName = `${user.firstName} ${user.lastName}`.toLowerCase();
-    const query = searchQuery.toLowerCase();
+  const filteredUsers = getCurrentUsers().filter((user) => {
+    const fullName = `${user.firstName || ""} ${user.lastName || ""}`.trim().toLowerCase();
+    const email = (user.email || "").toLowerCase();
+    const dept = (user.department || "").toLowerCase();
+    const role = (user.role || "").toLowerCase();
+    const query = (searchQuery || "").toLowerCase();
+
     return (
       fullName.includes(query) ||
-      user.email.toLowerCase().includes(query) ||
-      (user.department && user.department.toLowerCase().includes(query))
+      email.includes(query) ||
+      dept.includes(query) ||
+      role.includes(query)
     );
   });
-  
+
   return (
     <div className="min-h-screen bg-gray-50">
       {/* Header */}
@@ -269,21 +292,17 @@ const UsersPage = () => {
       </div>
 
       <div className="max-w-7xl mx-auto px-6 py-6">
-        {/* Tab Navigation */}
-        <TabNavigation 
-          tabs={tabs} 
-          activeTab={activeTab} 
-          onTabChange={setActiveTab} 
-        />
+        {/* Tabs */}
+        <TabNavigation tabs={tabs} activeTab={activeTab} onTabChange={setActiveTab} />
 
-        {/* Search Bar */}
+        {/* Search */}
         <SearchBar
           value={searchQuery}
           onChange={(e) => setSearchQuery(e.target.value)}
-          placeholder={`Search ${getRoleLabel().toLowerCase()}s by name, email, or department...`}
+          placeholder={`Search ${getRoleLabel().toLowerCase()}s by name, email, department, or role...`}
         />
 
-        {/* Users Table */}
+        {/* Table */}
         {loading ? (
           <div className="bg-white rounded-lg shadow-sm p-12 text-center">
             <div className="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-green-700"></div>
@@ -341,7 +360,7 @@ const UsersPage = () => {
           setShowDeleteConfirm(false);
           setSelectedUser(null);
         }}
-        onConfirm={handleDeleteUser}
+        onConfirm={(u) => handleDeleteUser(u?.id)}
         user={selectedUser}
       />
 
