@@ -37,7 +37,7 @@ const getAuth = () => {
   const token = typeof window !== "undefined" ? sessionStorage.getItem("access_token") : null;
 
   // IMPORTANT: adminId from admin_id (not user_id)
-  const adminIdRaw = typeof window !== "undefined" ? sessionStorage.getItem("admin_id") : null;
+  const adminIdRaw = typeof window !== "undefined" ? sessionStorage.getItem("user_id") : null;
 
   const rawRole = typeof window !== "undefined" ? sessionStorage.getItem("admin_role") : null;
   const rawDept = typeof window !== "undefined" ? sessionStorage.getItem("admin_department") : null;
