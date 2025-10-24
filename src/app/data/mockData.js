@@ -1,7 +1,12 @@
 // data/jobs.js
+// Loads jobs from the API, enriches each job with detail data, normalizes fields
+// to match your mock shape, and filters visibility by admin role/department
+// stored in sessionStorage.
+
 const API_BASE = "https://jellyfish-app-z83s2.ondigitalocean.app";
 
-/** ---------------- helpers: field normalization ---------------- **/
+/* ---------------- helpers: normalization ---------------- */
+
 function normalizeType(s) {
   const v = String(s || "").toLowerCase().replace(/[-_]/g, "");
   if (v.includes("full")) return "Full-time";
@@ -32,19 +37,28 @@ function inferSeniority(job_title = "") {
 
 function mapQuestionType(t = "") {
   const s = t.toString().toLowerCase().replace(/[_\s]/g, "-");
-  // API examples: "Multiple_Choice"
   if (s.includes("multiple")) return "multiple-choice";
   if (s.includes("yes") || s.includes("no")) return "yes-no";
   if (s.includes("long")) return "long-text";
   return "short-text";
 }
 
-/** ---------------- adapters ---------------- **/
+function normalizeStatus(s) {
+  const v = String(s || "").toUpperCase();
+  if (v === "REVIEW" || v === "IN_REVIEW" || v === "PENDING") return "pending";
+  if (v === "APPROVED") return "approved";
+  if (v === "REJECTED" || v === "DECLINED") return "rejected";
+  return "pending"; // default so new posts show up
+}
+
+/* ---------------- adapters ---------------- */
+
 function adaptListItem(apiJob) {
   const { city, locationType } = parseOffice(apiJob.office);
-  const salary = Array.isArray(apiJob.filters) && apiJob.filters[0]?.salary
-    ? Number(apiJob.filters[0].salary)
-    : 0;
+  const salary =
+    Array.isArray(apiJob.filters) && apiJob.filters[0]?.salary
+      ? Number(apiJob.filters[0].salary)
+      : 0;
 
   return {
     id: apiJob.job_id,
@@ -58,34 +72,30 @@ function adaptListItem(apiJob) {
     submittedBy: apiJob.poster_id?.slice(0, 8) || "Unknown",
     submittedDate: apiJob.created_at || new Date().toISOString().split("T")[0],
     description: apiJob.job_description || "",
-    responsibilities: "", // to be filled by detail call
-    requiredSkills: [],   // to be filled by detail call
-    preferredSkills: [],  // API doesn't provide; leaving blank
-    education: "",        // API doesn't provide; leaving blank
-    benefits: "",         // API doesn't provide; leaving blank
-    customQuestions: [],  // to be filled by detail call
-    status: (apiJob.status || "REVIEW").toLowerCase(),
-    priority: "medium",   // default; matches your PRIORITY_COLORS
+    responsibilities: "", // filled by detail call
+    requiredSkills: [],   // filled by detail call
+    preferredSkills: [],  // API doesn't provide
+    education: "",        // API doesn't provide
+    benefits: "",         // API doesn't provide
+    customQuestions: [],  // filled by detail call
+    status: normalizeStatus(apiJob.status),
+    priority: "medium",   // default key for your PRIORITY_COLORS
     _hasDetail: false,
   };
 }
 
 function mergeDetailIntoJob(base, detail) {
-  // salary override if detail has filters
   const dFilter0 =
     Array.isArray(detail.filters) && detail.filters.length > 0 ? detail.filters[0] : null;
   const salary = Number(dFilter0?.salary ?? base.salaryRange.min ?? 0);
 
-  // responsibilities: join duties into the "• ..." bullet string your UI expects
   const duties = Array.isArray(detail.duties) ? detail.duties.filter(Boolean) : [];
   const responsibilities = duties.length ? `• ${duties.join("\n• ")}` : base.responsibilities;
 
-  // requirements → requiredSkills array (keep strings)
   const requiredSkills = Array.isArray(detail.requirements)
     ? detail.requirements.filter(Boolean)
     : base.requiredSkills;
 
-  // questions → customQuestions (map to your shape)
   const customQuestions = Array.isArray(detail.questions)
     ? detail.questions.map((q) => ({
         question: q.question || "",
@@ -102,15 +112,20 @@ function mergeDetailIntoJob(base, detail) {
     responsibilities,
     requiredSkills,
     customQuestions,
+    status: normalizeStatus(detail.status || base.status),
     _hasDetail: true,
   };
 }
 
-/** ---------------- role/department filtering ---------------- **/
+/* ---------------- role/department filtering ---------------- */
+
 function filterByRoleDepartment(jobs) {
   if (typeof window === "undefined") return jobs;
   const role = (sessionStorage.getItem("admin_role") || "").toUpperCase();
   const dept = sessionStorage.getItem("admin_department") || "";
+
+  // Show all if role not set yet (avoid empty screen during setup/dev)
+  if (!role) return jobs;
 
   if (role === "FINANCE" || role === "SUPERUSER" || role === "SUPERADMIN") {
     return jobs;
@@ -123,7 +138,8 @@ function filterByRoleDepartment(jobs) {
   return [];
 }
 
-/** ---------------- api calls ---------------- **/
+/* ---------------- api calls ---------------- */
+
 async function fetchAllPosts() {
   const res = await fetch(`${API_BASE}/api/candidate/allPosts`, {
     method: "GET",
@@ -142,14 +158,11 @@ async function fetchPostDetail(jobId) {
     method: "GET",
     headers: { accept: "application/json" },
   });
-  if (!res.ok) {
-    // swallow errors per-item; detail is optional
-    return null;
-  }
+  if (!res.ok) return null; // detail is optional per-item
   return res.json();
 }
 
-/** Limit concurrent detail fetches to avoid hammering the API */
+// limit concurrent detail calls
 async function fetchDetailsInBatches(ids, batchSize = 4) {
   const results = {};
   for (let i = 0; i < ids.length; i += batchSize) {
@@ -163,13 +176,14 @@ async function fetchDetailsInBatches(ids, batchSize = 4) {
   return results;
 }
 
-/** ---------------- public API ---------------- **/
+/* ---------------- public API ---------------- */
+
 export async function getJobs() {
   // 1) list
   const list = await fetchAllPosts();
   const baseJobs = list.map(adaptListItem);
 
-  // 2) details (to fill missing data)
+  // 2) details
   const ids = baseJobs.map((j) => j.id);
   const detailsMap = await fetchDetailsInBatches(ids, 4);
 
@@ -178,11 +192,10 @@ export async function getJobs() {
     return detail ? mergeDetailIntoJob(job, detail) : job;
   });
 
-  // 3) visibility by role/department
+  // 3) visibility
   return filterByRoleDepartment(merged);
 }
 
-/** Optional grouping helper for your UI */
 export function groupByDepartment(jobs) {
   const out = {};
   for (const j of jobs) {
@@ -192,5 +205,5 @@ export function groupByDepartment(jobs) {
   return out;
 }
 
-/** Legacy export; leave empty so old imports won't explode */
+// Legacy export: keep symbol but no static items (real data comes from API)
 export const mockJobs = [];
