@@ -26,7 +26,7 @@ function parseOffice(office) {
 }
 
 function inferSeniority(job_title = "") {
-  const s = job_title.toLowerCase();
+  const s = (job_title || "").toLowerCase();
   if (s.includes("executive")) return "Executive Level";
   if (s.includes("senior")) return "Senior Level";
   if (s.includes("mid")) return "Mid Level";
@@ -48,7 +48,17 @@ function normalizeStatus(s) {
   if (v === "REVIEW" || v === "IN_REVIEW" || v === "PENDING") return "pending";
   if (v === "APPROVED") return "approved";
   if (v === "REJECTED" || v === "DECLINED") return "rejected";
-  return "pending"; // default so new posts show up
+  return "pending";
+}
+
+/** Prefer a human title. If job_title looks like a label (e.g. "EXTERNAL"),
+ * fall back to expected_candidates which reads like "Software Engineer". */
+function pickTitle(job_title, expected_candidates) {
+  const jt = String(job_title || "").trim();
+  if (!jt) return expected_candidates || "Untitled Job";
+  const labelish = jt.toUpperCase() === jt && jt.length <= 20; // "EXTERNAL" style
+  if (labelish && expected_candidates) return expected_candidates;
+  return jt;
 }
 
 /* ---------------- adapters ---------------- */
@@ -62,12 +72,12 @@ function adaptListItem(apiJob) {
 
   return {
     id: apiJob.job_id,
-    title: apiJob.job_title || apiJob.expected_candidates || "Untitled Job",
-    department: apiJob.department || "Unknown",
+    title: pickTitle(apiJob.job_title, apiJob.expected_candidates),
+    department: String(apiJob.department || "Unknown").trim(),
     type: normalizeType(apiJob.employment_type),
     locationType,
     city,
-    seniorityLevel: inferSeniority(apiJob.job_title),
+    seniorityLevel: inferSeniority(apiJob.job_title || apiJob.expected_candidates),
     salaryRange: { min: String(salary), max: String(salary), currency: "ZAR" },
     submittedBy: apiJob.poster_id?.slice(0, 8) || "Unknown",
     submittedDate: apiJob.created_at || new Date().toISOString().split("T")[0],
@@ -106,6 +116,7 @@ function mergeDetailIntoJob(base, detail) {
 
   return {
     ...base,
+    title: pickTitle(detail.job_title, detail.expected_candidates) || base.title,
     salaryRange: { ...base.salaryRange, min: String(salary), max: String(salary) },
     description: detail.job_description || base.description,
     submittedDate: detail.created_at || base.submittedDate,
@@ -121,10 +132,10 @@ function mergeDetailIntoJob(base, detail) {
 
 function filterByRoleDepartment(jobs) {
   if (typeof window === "undefined") return jobs;
-  const role = (sessionStorage.getItem("admin_role") || "").toUpperCase();
-  const dept = sessionStorage.getItem("admin_department") || "";
+  const role = (sessionStorage.getItem("admin_role") || "").trim().toUpperCase();
+  const dept = (sessionStorage.getItem("admin_department") || "").trim();
 
-  // Show all if role not set yet (avoid empty screen during setup/dev)
+  // If no role set yet, show all to avoid blank screen
   if (!role) return jobs;
 
   if (role === "FINANCE" || role === "SUPERUSER" || role === "SUPERADMIN") {
@@ -132,9 +143,11 @@ function filterByRoleDepartment(jobs) {
   }
   if (role === "MANAGER" && dept) {
     return jobs.filter(
-      (j) => (j.department || "").toUpperCase() === dept.toUpperCase()
+      (j) => (j.department || "").trim().toUpperCase() === dept.toUpperCase()
     );
   }
+  // Unknown role → show nothing (strict), but log for visibility
+  console.warn("[jobs] No jobs due to role filter. role=", role, "dept=", dept);
   return [];
 }
 
@@ -154,12 +167,20 @@ async function fetchAllPosts() {
 }
 
 async function fetchPostDetail(jobId) {
-  const res = await fetch(`${API_BASE}/api/candidate/viewPost/${jobId}`, {
-    method: "GET",
-    headers: { accept: "application/json" },
-  });
-  if (!res.ok) return null; // detail is optional per-item
-  return res.json();
+  try {
+    const res = await fetch(`${API_BASE}/api/candidate/viewPost/${jobId}`, {
+      method: "GET",
+      headers: { accept: "application/json" },
+    });
+    if (!res.ok) {
+      console.warn(`[jobs] detail ${jobId} -> ${res.status}`);
+      return null;
+    }
+    return await res.json();
+  } catch (e) {
+    console.warn(`[jobs] detail ${jobId} failed`, e);
+    return null;
+  }
 }
 
 // limit concurrent detail calls
@@ -180,20 +201,40 @@ async function fetchDetailsInBatches(ids, batchSize = 4) {
 
 export async function getJobs() {
   // 1) list
-  const list = await fetchAllPosts();
+  let list = [];
+  try {
+    list = await fetchAllPosts();
+  } catch (e) {
+    console.error("[jobs] fetchAllPosts failed:", e?.message || e);
+    return []; // nothing we can do
+  }
+
+  // Adapt base items
   const baseJobs = list.map(adaptListItem);
 
-  // 2) details
+  // 2) details (best-effort)
   const ids = baseJobs.map((j) => j.id);
-  const detailsMap = await fetchDetailsInBatches(ids, 4);
+  let detailsMap = {};
+  try {
+    detailsMap = await fetchDetailsInBatches(ids, 4);
+  } catch (e) {
+    console.warn("[jobs] fetchDetailsInBatches failed; proceeding with base list only");
+  }
 
   const merged = baseJobs.map((job) => {
     const detail = detailsMap[job.id];
     return detail ? mergeDetailIntoJob(job, detail) : job;
   });
 
-  // 3) visibility
-  return filterByRoleDepartment(merged);
+  // 3) visibility by role/department (with safe fallback)
+  const filtered = filterByRoleDepartment(merged);
+  if (filtered.length === 0 && merged.length > 0) {
+    // If filtering removed everything, fall back to showing all
+    // to avoid the "nothing displayed" UX surprise.
+    console.warn("[jobs] Role/department filter returned 0; falling back to all jobs.");
+    return merged;
+  }
+  return filtered;
 }
 
 export function groupByDepartment(jobs) {
