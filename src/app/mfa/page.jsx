@@ -51,6 +51,8 @@ export default function MFAPage() {
       }
 
       sessionStorage.setItem("admin_email", data.email);
+      sessionStorage.setItem("admin_department", data.department);
+      sessionStorage.setItem("admin_role", data.role);
       router.push("/pages/dashboard");
     } catch (err) {
       setError(err.message);
