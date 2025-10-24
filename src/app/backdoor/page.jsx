@@ -93,7 +93,7 @@ export default function BackdoorAddAdminPage() {
     try {
       const payload = buildPayload();
 
-      await postJSON(`${API_BASE}/api/admin/backdoorAdmnUzr`, token, payload);
+      await postJSON(`${API_BASE}/api/admin/backdoorAdmnUzr`, payload);
 
       setShowSuccess(true);
       setFormData({
