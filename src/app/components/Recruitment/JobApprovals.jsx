@@ -159,8 +159,12 @@ const JobApprovalsPage = () => {
   const confirmApprove = async () => {
     if (!actioningJobId || !selectedJob) return;
 
+    console.log("Approve clicked");
+    console.log("actioningJobId:", actioningJobId);
+    console.log("selectedJob:", selectedJob);
+    
     try {
-      // ✅ Get admin data from sessionStorage
+      // Get admin data from sessionStorage
       const admin_id = sessionStorage.getItem("user_id");
       const role = sessionStorage.getItem("admin_role");
       const department = sessionStorage.getItem("admin_department");
@@ -169,7 +173,7 @@ const JobApprovalsPage = () => {
         throw new Error("Admin session not found");
       }
 
-      // ✅ Get job data safely
+      // Get job data safely
       const employee_id = selectedJob.poster_id;
       const job_id = selectedJob.job_id;
 
