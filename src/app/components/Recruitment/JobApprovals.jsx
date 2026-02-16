@@ -157,20 +157,102 @@ const JobApprovalsPage = () => {
   };
 
   const confirmApprove = async () => {
-    if (!actioningJobId) return;
+    if (!actioningJobId || !selectedJob) return;
 
-    // TODO: Replace with your real API call
-    // await fetch(`${API_BASE}/api/approvals/approve/${actioningJobId}`, { method: "POST" });
+    try {
+      // ✅ Get admin data from sessionStorage
+      const admin_id = sessionStorage.getItem("user_id");
+      const role = sessionStorage.getItem("admin_role");
+      const department = sessionStorage.getItem("admin_department");
 
-    const updatedJobs = pendingJobs.map((job) =>
-      job.id === actioningJobId ? { ...job, status: "APPROVED" } : job
-    );
-    setPendingJobs(updatedJobs);
-    updateStats(updatedJobs);
+      if (!admin_id || !role) {
+        throw new Error("Admin session not found");
+      }
 
-    setShowApproveModal(false);
-    setActioningJobId(null);
-    setSelectedJob(null);
+      // ✅ Get job data safely
+      const employee_id = selectedJob.poster_id;
+      const job_id = selectedJob.job_id;
+
+      let url = "";
+      let body = {};
+      let newStatus = "";
+
+      // DEPARTMENT MANAGER
+      if (role === "MANAGER") {
+        url = `${API_BASE}/api/admin/departmentApprove/${admin_id}/${employee_id}/${job_id}`;
+
+        body = {
+          admin_id,
+          employee_id,
+          job_id,
+          status: "PASSED",
+        };
+
+        newStatus = "PASSED";
+      }
+
+      // FINANCE MANAGER
+      else if (role === "MANAGER" && department === "FINANCE") {
+        url = `${API_BASE}/api/admin/financeApproval/${admin_id}/${job_id}`;
+
+        body = {
+          admin_id,
+          job_id,
+        };
+
+        newStatus = "REVIEWED";
+      }
+
+      // HR MANAGER (FINAL)
+      else if (role === "HR_MANAGER") {
+        url = `${API_BASE}/api/admin/approveJobPost/${admin_id}/${employee_id}/${job_id}`;
+
+        body = {
+          admin_id,
+          employee_id,
+          job_id,
+          status: "APPROVED",
+        };
+
+        newStatus = "APPROVED";
+      }
+
+      else {
+        throw new Error("You are not authorized to approve this job post");
+      }
+
+      const response = await fetch(url, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(body),
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.message || "Approval failed");
+      }
+
+      // Update UI only after success
+      const updatedJobs = pendingJobs.map((job) =>
+        job.id === actioningJobId
+          ? { ...job, status: newStatus }
+          : job
+      );
+
+      setPendingJobs(updatedJobs);
+      updateStats(updatedJobs);
+
+      setShowApproveModal(false);
+      setActioningJobId(null);
+      setSelectedJob(null);
+
+    } catch (error) {
+      console.error("Approval error:", error);
+      alert(error.message);
+    }
   };
 
   const handleReject = (jobId) => {
@@ -179,27 +261,90 @@ const JobApprovalsPage = () => {
   };
 
   const confirmReject = async () => {
-    if (!actioningJobId || !rejectionReason.trim()) return;
+    if (!actioningJobId || !selectedJob || !rejectionReason.trim()) return;
 
-    // TODO: Replace with your real API call (include reason)
-    // await fetch(`${API_BASE}/api/approvals/reject/${actioningJobId}`, {
-    //   method: "POST",
-    //   headers: { "Content-Type": "application/json" },
-    //   body: JSON.stringify({ reason: rejectionReason }),
-    // });
+    try {
+      const admin_id = sessionStorage.getItem("user_id");
+      const role = sessionStorage.getItem("admin_role");
+      const department = sessionStorage.getItem("admin_department");
 
-    const updatedJobs = pendingJobs.map((job) =>
-      job.id === actioningJobId
-        ? { ...job, status: "REJECTED", rejectionReason }
-        : job
-    );
-    setPendingJobs(updatedJobs);
-    updateStats(updatedJobs);
+      if (!admin_id || !role) {
+        throw new Error("Admin session not found");
+      }
 
-    setShowRejectModal(false);
-    setActioningJobId(null);
-    setRejectionReason("");
-    setSelectedJob(null);
+      const employee_id = selectedJob.poster_id;
+      const job_id = selectedJob.job_id;
+
+      let url = "";
+      let body = {};
+      let newStatus = "REJECTED";
+
+      // DEPARTMENT MANAGER
+      if (role === "MANAGER") {
+        url = `${API_BASE}/api/admin/departmentApprove/${admin_id}/${employee_id}/${job_id}`;
+
+        body = {
+          admin_id,
+          employee_id,
+          job_id,
+          status: "REJECTED"
+        };
+      }
+
+      // HR MANAGER
+      else if (role === "HR_MANAGER") {
+        url = `${API_BASE}/api/admin/approveJobPost/${admin_id}/${employee_id}/${job_id}`;
+
+        body = {
+          admin_id,
+          employee_id,
+          job_id,
+          status: "REJECTED"
+        };
+      }
+
+      // FINANCE CANNOT REJECT
+      else if (role === "MANAGER" && department === "FINANCE") {
+        throw new Error("Finance managers cannot reject job posts at this stage");
+      }
+
+      else {
+        throw new Error("You are not authorized to reject this job post");
+      }
+
+      const response = await fetch(url, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(body),
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.message || "Rejection failed");
+      }
+
+      // Update UI only after backend success
+      const updatedJobs = pendingJobs.map((job) =>
+        job.id === actioningJobId
+          ? { ...job, status: newStatus, rejectionReason }
+          : job
+      );
+
+      setPendingJobs(updatedJobs);
+      updateStats(updatedJobs);
+
+      setShowRejectModal(false);
+      setActioningJobId(null);
+      setRejectionReason("");
+      setSelectedJob(null);
+
+    } catch (error) {
+      console.error("Rejection error:", error);
+      alert(error.message);
+    }
   };
 
   const cancelApprove = () => {

@@ -76,7 +76,7 @@ export default function BackdoorAddAdminPage() {
   ];
 
   // Using your enum list
-  const roleOptions = ["SUPERADMIN","ADMIN","HR","RECRUITER","MANAGER","FINANCE"];
+  const roleOptions = ["SUPERADMIN","ADMIN","HR_MANAGER","RECRUITER","MANAGER","FINANCE"];
 
   // Build payload with normalized values
   const buildPayload = () => ({
