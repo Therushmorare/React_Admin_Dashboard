@@ -338,7 +338,25 @@ const JobApprovalsPage = () => {
 
   // ====================== RENDER ======================
   return (
-    <div>
+    <div className="min-h-screen bg-gray-50">
+      {/* Header */}
+      <div className="bg-white border-b border-gray-200">
+        <div className="max-w-7xl mx-auto px-6 py-6">
+          <div className="flex justify-between items-center">
+            <div>
+              <h1 className="text-3xl font-bold text-gray-900">Job Post Approvals</h1>
+              <p className="text-gray-600 mt-1">Review and approve pending job postings</p>
+            </div>
+            <div className="flex items-center space-x-2 text-sm text-gray-600">
+              <Clock size={16} />
+              <span>Avg. approval time: {stats.avgApprovalTime}</span>
+            </div>
+          </div>
+          {error && <div className="mt-3 text-sm text-red-600">{error}</div>}
+        </div>
+      </div>
+
+      <div className="max-w-7xl mx-auto px-6 py-6">
       <StatsCards stats={stats} />
       <FilterSearch
         selectedFilter={selectedFilter}
@@ -361,6 +379,8 @@ const JobApprovalsPage = () => {
       ) : (
         <EmptyState />
       )}
+      </div>
+      
       {selectedJob && (
         <JobDetailModal
           job={selectedJob}
