@@ -349,25 +349,45 @@ const JobApprovalsPage = () => {
   // --------------- Filters / Search (ROLE BASED) ---------------
   const filteredJobs = useMemo(() => {
     const norm = (s) => (s || "").toLowerCase();
+    const statusUpper = (s) => (s || "").toUpperCase();
+
     return pendingJobs
       .filter((job) => {
-        if (!user.role) return false;
-        const status = toUpper(job.status);
-        if (user.role === "MANAGER" && user.department !== "FINANCE" && status === "PENDING") return true;
-        if (user.role === "MANAGER" && user.department === "FINANCE" && status === "PASSED") return true;
-        if (user.role === "HR_MANAGER" && status === "REVIEWED") return true;
+        if (!user?.role) return false;
+
+        const status = statusUpper(job.status);
+
+        // 🔹 MANAGER (Non-Finance) → sees jobs awaiting department approval
+        if (user.role === "MANAGER" && user.department !== "FINANCE") {
+          return ["PENDING", "REVIEW", "SUBMITTED"].includes(status);
+        }
+
+        // 🔹 FINANCE MANAGER → sees jobs passed department
+        if (user.role === "MANAGER" && user.department === "FINANCE") {
+          return ["PASSED", "DEPT_APPROVED"].includes(status);
+        }
+
+        // 🔹 HR MANAGER → sees finance approved jobs
+        if (user.role === "HR_MANAGER") {
+          return ["REVIEWED", "FINANCE_APPROVED"].includes(status);
+        }
+
         return false;
       })
-      .filter((job) => (selectedFilter === "all" ? true : job.priority === selectedFilter))
+      .filter((job) =>
+        selectedFilter === "all" ? true : job.priority === selectedFilter
+      )
       .filter((job) => {
         if (!searchQuery) return true;
+
         return (
           norm(job.title).includes(norm(searchQuery)) ||
           norm(job.department).includes(norm(searchQuery)) ||
-          norm(job.submittedBy || "").includes(norm(searchQuery)) ||
+          norm(job.submittedBy).includes(norm(searchQuery)) ||
           norm(job.office).includes(norm(searchQuery))
         );
       });
+
   }, [pendingJobs, selectedFilter, searchQuery, user]);
 
   // --------------- Card actions ---------------
