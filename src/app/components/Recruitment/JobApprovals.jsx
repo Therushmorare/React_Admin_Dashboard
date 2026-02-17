@@ -140,6 +140,7 @@ const JobApprovalsPage = () => {
         pending: pendingCount,
         approved: approvedCount,
         rejected: rejectedCount,
+        active: activeCount,
         avgApprovalTime,
       });
 
