@@ -27,7 +27,7 @@ const derivePriority = (job) => {
 const normalizeSalary = (filters) => {
   const f0 = (filters && filters[0]) || {};
   const amount =
-    typeof f0.salary === "number" && Number.isFinite(f0.salary) ? f0.salary : null; // null if not provided
+    typeof f0.salary === "number" && Number.isFinite(f0.salary) ? f0.salary : null;
   return { amount, currency: "ZAR" };
 };
 
@@ -61,6 +61,7 @@ const formatMoney = (money) => {
 
 // ======================= Page =========================
 const JobApprovalsPage = () => {
+  const [user, setUser] = useState({ role: null, department: null });
   const [selectedFilter, setSelectedFilter] = useState("all");
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedJob, setSelectedJob] = useState(null);
@@ -82,6 +83,13 @@ const JobApprovalsPage = () => {
     rejected: 3,
     avgApprovalTime: "2.5 days",
   });
+
+  // ================== USER ROLE =====================
+  useEffect(() => {
+    const role = sessionStorage.getItem("admin_role");
+    const department = sessionStorage.getItem("admin_department");
+    setUser({ role, department });
+  }, []);
 
   // --------------- API: list ---------------
   const loadJobs = useCallback(async () => {
@@ -165,96 +173,52 @@ const JobApprovalsPage = () => {
       alert("Job not found");
       return;
     }    
+
     try {
-      // Get admin data from sessionStorage
       const admin_id = sessionStorage.getItem("user_id");
       const role = sessionStorage.getItem("admin_role");
       const department = sessionStorage.getItem("admin_department");
 
-      if (!admin_id || !role) {
-        throw new Error("Admin session not found");
-      }
+      if (!admin_id || !role) throw new Error("Admin session not found");
 
-      // Get job data safely
-      const employee_id = job.submittedBy; // since you mapped poster_id → submittedBy
+      const employee_id = job.submittedBy;
       const job_id = job.id;
 
       let url = "";
       let body = {};
       let newStatus = "";
 
-      console.log("employee_id:", employee_id);
-      console.log("department_id:", department);
-      console.log("job_id:", job_id);
-
-      // DEPARTMENT MANAGER
       if (role === "MANAGER" && department !== "FINANCE") {
         url = `${API_BASE}/api/admin/departmentApprove/${admin_id}/${employee_id}/${job_id}`;
-
-        body = {
-          admin_id,
-          employee_id,
-          job_id,
-          status: "PASSED",
-        };
-
+        body = { admin_id, employee_id, job_id, status: "PASSED" };
         newStatus = "PASSED";
-      }
-
-      // FINANCE MANAGER
-      else if (role === "MANAGER" && department === "FINANCE") {
+      } else if (role === "MANAGER" && department === "FINANCE") {
         url = `${API_BASE}/api/admin/financeApproval/${admin_id}/${job_id}`;
-
-        body = {
-          admin_id,
-          job_id,
-        };
-
+        body = { admin_id, job_id };
         newStatus = "REVIEWED";
-      }
-
-      // HR MANAGER (FINAL)
-      else if (role === "HR_MANAGER") {
+      } else if (role === "HR_MANAGER") {
         url = `${API_BASE}/api/admin/approveJobPost/${admin_id}/${employee_id}/${job_id}`;
-
-        body = {
-          admin_id,
-          employee_id,
-          job_id,
-          status: "APPROVED",
-        };
-
+        body = { admin_id, employee_id, job_id, status: "APPROVED" };
         newStatus = "APPROVED";
-      }
-
-      else {
+      } else {
         throw new Error("You are not authorized to approve this job post");
       }
 
       const response = await fetch(url, {
         method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify(body),
       });
 
       const data = await response.json();
+      if (!response.ok) throw new Error(data.message || "Approval failed");
 
-      if (!response.ok) {
-        throw new Error(data.message || "Approval failed");
-      }
-
-      // Update UI only after success
-      const updatedJobs = pendingJobs.map((job) =>
-        job.id === actioningJobId
-          ? { ...job, status: newStatus }
-          : job
+      const updatedJobs = pendingJobs.map((j) =>
+        j.id === actioningJobId ? { ...j, status: newStatus } : j
       );
 
       setPendingJobs(updatedJobs);
       updateStats(updatedJobs);
-
       setShowApproveModal(false);
       setActioningJobId(null);
       setSelectedJob(null);
@@ -271,81 +235,55 @@ const JobApprovalsPage = () => {
   };
 
   const confirmReject = async () => {
-    if (!actioningJobId || !selectedJob || !rejectionReason.trim()) return;
+    if (!actioningJobId) return;
+
+    const job = pendingJobs.find(j => j.id === actioningJobId);
+    if (!job) {
+      alert("Job not found");
+      return;
+    }    
 
     try {
       const admin_id = sessionStorage.getItem("user_id");
       const role = sessionStorage.getItem("admin_role");
       const department = sessionStorage.getItem("admin_department");
 
-      if (!admin_id || !role) {
-        throw new Error("Admin session not found");
-      }
+      if (!admin_id || !role) throw new Error("Admin session not found");
 
-      const employee_id = selectedJob.poster_id;
-      const job_id = selectedJob.job_id;
+      const employee_id = job.submittedBy;
+      const job_id = job.id;
 
       let url = "";
       let body = {};
-      let newStatus = "REJECTED";
+      const newStatus = "REJECTED";
 
-      // DEPARTMENT MANAGER
-      if (role === "MANAGER") {
-        url = `${API_BASE}/api/admin/departmentApprove/${admin_id}/${employee_id}/${job_id}`;
-
-        body = {
-          admin_id,
-          employee_id,
-          job_id,
-          status: "REJECTED"
-        };
-      }
-
-      // HR MANAGER
-      else if (role === "HR_MANAGER") {
-        url = `${API_BASE}/api/admin/approveJobPost/${admin_id}/${employee_id}/${job_id}`;
-
-        body = {
-          admin_id,
-          employee_id,
-          job_id,
-          status: "REJECTED"
-        };
-      }
-
-      // FINANCE CANNOT REJECT
-      else if (role === "MANAGER" && department === "FINANCE") {
+      if (role === "MANAGER" && department === "FINANCE") {
         throw new Error("Finance managers cannot reject job posts at this stage");
-      }
-
-      else {
+      } else if (role === "MANAGER") {
+        url = `${API_BASE}/api/admin/departmentApprove/${admin_id}/${employee_id}/${job_id}`;
+        body = { admin_id, employee_id, job_id, status: "REJECTED" };
+      } else if (role === "HR_MANAGER") {
+        url = `${API_BASE}/api/admin/approveJobPost/${admin_id}/${employee_id}/${job_id}`;
+        body = { admin_id, employee_id, job_id, status: "REJECTED" };
+      } else {
         throw new Error("You are not authorized to reject this job post");
       }
 
       const response = await fetch(url, {
         method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify(body),
       });
 
       const data = await response.json();
+      if (!response.ok) throw new Error(data.message || "Rejection failed");
 
-      if (!response.ok) {
-        throw new Error(data.message || "Rejection failed");
-      }
-
-      // Update UI only after backend success
-      const updatedJobs = pendingJobs.map((job) =>
-        job.id === actioningJobId
-          ? { ...job, status: newStatus, rejectionReason }
-          : job
+      const updatedJobs = pendingJobs.map((j) =>
+        j.id === actioningJobId ? { ...j, status: newStatus, rejectionReason } : j
       );
 
       setPendingJobs(updatedJobs);
       updateStats(updatedJobs);
-
       setShowRejectModal(false);
       setActioningJobId(null);
       setRejectionReason("");
@@ -368,11 +306,18 @@ const JobApprovalsPage = () => {
     setRejectionReason("");
   };
 
-  // --------------- Filters / Search ---------------
+  // --------------- Filters / Search (ROLE BASED) ---------------
   const filteredJobs = useMemo(() => {
     const norm = (s) => (s || "").toLowerCase();
     return pendingJobs
-      .filter((job) => toUpper(job.status) === "REVIEW") // pending
+      .filter((job) => {
+        if (!user.role) return false;
+        const status = toUpper(job.status);
+        if (user.role === "MANAGER" && user.department !== "FINANCE" && status === "PENDING") return true;
+        if (user.role === "MANAGER" && user.department === "FINANCE" && status === "PASSED") return true;
+        if (user.role === "HR_MANAGER" && status === "REVIEWED") return true;
+        return false;
+      })
       .filter((job) => (selectedFilter === "all" ? true : job.priority === selectedFilter))
       .filter((job) => {
         if (!searchQuery) return true;
@@ -383,92 +328,57 @@ const JobApprovalsPage = () => {
           norm(job.office).includes(norm(searchQuery))
         );
       });
-  }, [pendingJobs, selectedFilter, searchQuery]);
+  }, [pendingJobs, selectedFilter, searchQuery, user]);
 
   // --------------- Card actions ---------------
   const onViewDetails = async (jobCard) => {
-    setSelectedJob(jobCard); // show immediately
-    await fetchJobDetails(jobCard.id); // then hydrate
+    setSelectedJob(jobCard);
+    await fetchJobDetails(jobCard.id);
   };
 
+  // ====================== RENDER ======================
   return (
-    <div className="min-h-screen bg-gray-50">
-      {/* Header */}
-      <div className="bg-white border-b border-gray-200">
-        <div className="max-w-7xl mx-auto px-6 py-6">
-          <div className="flex justify-between items-center">
-            <div>
-              <h1 className="text-3xl font-bold text-gray-900">Job Post Approvals</h1>
-              <p className="text-gray-600 mt-1">Review and approve pending job postings</p>
-            </div>
-            <div className="flex items-center space-x-2 text-sm text-gray-600">
-              <Clock size={16} />
-              <span>Avg. approval time: {stats.avgApprovalTime}</span>
-            </div>
-          </div>
-          {error && <div className="mt-3 text-sm text-red-600">{error}</div>}
-        </div>
-      </div>
-
-      <div className="max-w-7xl mx-auto px-6 py-6">
-        {/* Stats Cards */}
-        <StatsCards stats={stats} />
-
-        {/* Filters and Search */}
-        <FilterSearch
-          selectedFilter={selectedFilter}
-          setSelectedFilter={setSelectedFilter}
-          searchQuery={searchQuery}
-          setSearchQuery={setSearchQuery}
-        />
-
-        {/* Job Cards Grid */}
-        {loading ? (
-          <div className="text-gray-600">Loading jobs…</div>
-        ) : filteredJobs.length > 0 ? (
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-            {filteredJobs.map((job) => (
-              <JobCard
-                key={job.id}
-                job={{
-                  ...job,
-                  // If JobCard prints salary directly, pass a preformatted string:
-                  salaryDisplay: formatMoney(job.salary),
-                }}
-                onViewDetails={() => onViewDetails(job)}
-                onApprove={() => handleApprove(job)}
-                onReject={() => handleReject(job.id)}
-              />
-            ))}
-          </div>
-        ) : (
-          <EmptyState />
-        )}
-      </div>
-
-      {/* Job Detail Modal */}
-      <JobDetailModal
-        job={
-          selectedJob
-            ? { ...selectedJob, salaryDisplay: formatMoney(selectedJob.salary) }
-            : null
-        }
-        loading={detailLoading}
-        onClose={() => setSelectedJob(null)}
-        onApprove={(jobId) => handleApprove(jobId || (selectedJob && selectedJob.id))}
-        onReject={(jobId) => handleReject(jobId || (selectedJob && selectedJob.id))}
+    <div>
+      <StatsCards stats={stats} />
+      <FilterSearch
+        selectedFilter={selectedFilter}
+        setSelectedFilter={setSelectedFilter}
+        searchQuery={searchQuery}
+        setSearchQuery={setSearchQuery}
       />
-
-      {/* Approve Confirmation Modal */}
-      <ApproveModal show={showApproveModal} onConfirm={confirmApprove} onCancel={cancelApprove} />
-
-      {/* Reject Modal */}
+      {loading ? (
+        <p>Loading jobs...</p>
+      ) : filteredJobs.length ? (
+        filteredJobs.map((job) => (
+          <JobCard
+            key={job.id}
+            job={job}
+            onApprove={() => handleApprove(job)}
+            onReject={() => handleReject(job.id)}
+            onViewDetails={() => onViewDetails(job)}
+          />
+        ))
+      ) : (
+        <EmptyState />
+      )}
+      {selectedJob && (
+        <JobDetailModal
+          job={selectedJob}
+          loading={detailLoading}
+          onClose={() => setSelectedJob(null)}
+        />
+      )}
+      <ApproveModal
+        show={showApproveModal}
+        onConfirm={confirmApprove}
+        onCancel={cancelApprove}
+      />
       <RejectModal
         show={showRejectModal}
-        onConfirm={confirmReject}
-        onCancel={cancelReject}
         reason={rejectionReason}
         setReason={setRejectionReason}
+        onConfirm={confirmReject}
+        onCancel={cancelReject}
       />
     </div>
   );
