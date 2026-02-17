@@ -151,18 +151,20 @@ const JobApprovalsPage = () => {
   };
 
   // --------------- Approve / Reject ---------------
-  const handleApprove = (jobId) => {
-    setActioningJobId(jobId);
+  const handleApprove = (job) => {
+    setSelectedJob(job);
+    setActioningJobId(job.id);
     setShowApproveModal(true);
   };
 
   const confirmApprove = async () => {
-    if (!actioningJobId || !selectedJob) return;
+    if (!actioningJobId) return;
 
-    console.log("Approve clicked");
-    console.log("actioningJobId:", actioningJobId);
-    console.log("selectedJob:", selectedJob);
-    
+    const job = pendingJobs.find(j => j.id === actioningJobId);
+    if (!job) {
+      alert("Job not found");
+      return;
+    }    
     try {
       // Get admin data from sessionStorage
       const admin_id = sessionStorage.getItem("user_id");
@@ -174,15 +176,15 @@ const JobApprovalsPage = () => {
       }
 
       // Get job data safely
-      const employee_id = selectedJob.poster_id;
-      const job_id = selectedJob.job_id;
+      const employee_id = job.submittedBy; // since you mapped poster_id → submittedBy
+      const job_id = job.id;
 
       let url = "";
       let body = {};
       let newStatus = "";
 
       // DEPARTMENT MANAGER
-      if (role === "MANAGER") {
+      if (role === "MANAGER" && department !== "FINANCE") {
         url = `${API_BASE}/api/admin/departmentApprove/${admin_id}/${employee_id}/${job_id}`;
 
         body = {
@@ -430,7 +432,7 @@ const JobApprovalsPage = () => {
                   salaryDisplay: formatMoney(job.salary),
                 }}
                 onViewDetails={() => onViewDetails(job)}
-                onApprove={() => handleApprove(job.id)}
+                onApprove={() => handleApprove(job)}
                 onReject={() => handleReject(job.id)}
               />
             ))}
