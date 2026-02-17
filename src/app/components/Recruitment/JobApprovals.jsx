@@ -183,6 +183,10 @@ const JobApprovalsPage = () => {
       let body = {};
       let newStatus = "";
 
+      console.log("employee_id:", employee_id);
+      console.log("department_id:", department);
+      console.log("job_id:", job_id);
+
       // DEPARTMENT MANAGER
       if (role === "MANAGER" && department !== "FINANCE") {
         url = `${API_BASE}/api/admin/departmentApprove/${admin_id}/${employee_id}/${job_id}`;
