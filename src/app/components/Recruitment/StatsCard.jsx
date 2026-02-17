@@ -37,7 +37,7 @@ const StatsCards = ({ stats }) => {
         <div className="flex items-center justify-between">
           <div>
             <p className="text-sm text-gray-600">Active Jobs</p>
-            <p className="text-3xl font-bold text-gray-900 mt-1">24</p>
+            <p className="text-3xl font-bold text-gray-900 mt-1">{stats.active}</p>
           </div>
           <Briefcase size={32} className="text-blue-500" />
         </div>
