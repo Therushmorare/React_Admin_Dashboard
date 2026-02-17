@@ -79,12 +79,12 @@ const JobApprovalsPage = () => {
 
   const [stats, setStats] = useState({
     pending: 0,
-    approved: 12,
-    rejected: 3,
-    avgApprovalTime: "2.5 days",
+    approved: 0,
+    rejected: 0,
+    avgApprovalTime: "—",
   });
 
-  // ================== USER ROLE =====================
+    // ================== USER ROLE =====================
   useEffect(() => {
     const role = sessionStorage.getItem("admin_role");
     const department = sessionStorage.getItem("admin_department");
@@ -95,18 +95,55 @@ const JobApprovalsPage = () => {
   const loadJobs = useCallback(async () => {
     setLoading(true);
     setError(null);
+
     try {
+      // Fetch all job posts
       const res = await fetch(`${API_BASE}/api/candidate/allPosts`, {
         headers: { accept: "application/json" },
         cache: "no-store",
       });
+
       if (!res.ok) throw new Error(`Failed to load jobs (${res.status})`);
+
       const data = await res.json();
-      const mapped = (data.jobs || []).map(mapApiJobToCard);
-      setPendingJobs(mapped);
-      updateStats(mapped);
-    } catch (e) {
-      setError(e?.message || "Failed to load jobs");
+
+      // Map API response to your internal job object
+      const mappedJobs = (data.jobs || []).map(mapApiJobToCard);
+
+      // Update pending jobs for rendering
+      setPendingJobs(mappedJobs);
+
+      // Calculate stats dynamically
+      const pendingCount = mappedJobs.filter(job => job.status.toUpperCase() === "REVIEW").length;
+      const approvedCount = mappedJobs.filter(job => job.status.toUpperCase() === "APPROVED").length;
+      const rejectedCount = mappedJobs.filter(job => job.status.toUpperCase() === "REJECTED").length;
+
+      // Optional: calculate average approval time if 'approvedAt' exists
+      let avgApprovalTime = "—";
+      const approvalTimes = mappedJobs
+        .filter(job => job.status.toUpperCase() === "APPROVED" && job.approvedAt)
+        .map(job => {
+          const created = new Date(job.createdAt);
+          const approved = new Date(job.approvedAt);
+          return (approved - created) / (1000 * 60 * 60 * 24); // days
+        });
+
+      if (approvalTimes.length > 0) {
+        const sumDays = approvalTimes.reduce((acc, d) => acc + d, 0);
+        avgApprovalTime = `${(sumDays / approvalTimes.length).toFixed(1)} days`;
+      }
+
+      // Update stats state
+      setStats({
+        pending: pendingCount,
+        approved: approvedCount,
+        rejected: rejectedCount,
+        avgApprovalTime,
+      });
+
+    } catch (err) {
+      console.error("Error loading jobs:", err);
+      setError(err?.message || "Failed to load jobs");
     } finally {
       setLoading(false);
     }
