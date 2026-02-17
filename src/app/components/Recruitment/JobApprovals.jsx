@@ -81,6 +81,7 @@ const JobApprovalsPage = () => {
     pending: 0,
     approved: 0,
     rejected: 0,
+    active: 0,
     avgApprovalTime: "—",
   });
 
@@ -117,6 +118,7 @@ const JobApprovalsPage = () => {
       const pendingCount = mappedJobs.filter(job => job.status.toUpperCase() === "REVIEW").length;
       const approvedCount = mappedJobs.filter(job => job.status.toUpperCase() === "APPROVED").length;
       const rejectedCount = mappedJobs.filter(job => job.status.toUpperCase() === "REJECTED").length;
+      const activeCount = mappedJobs.filter(job => job.status.toUpperCase() === "APPROVED").length;
 
       // Optional: calculate average approval time if 'approvedAt' exists
       let avgApprovalTime = "—";
