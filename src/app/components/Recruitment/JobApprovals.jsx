@@ -153,7 +153,7 @@ const JobApprovalsPage = () => {
   // --------------- Approve / Reject ---------------
   const handleApprove = (job) => {
     setSelectedJob(job);
-    setActioningJobId(job.job_id);
+    setActioningJobId(job.id);
     setShowApproveModal(true);
   };
 
