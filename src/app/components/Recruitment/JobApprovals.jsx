@@ -367,20 +367,22 @@ const JobApprovalsPage = () => {
       {loading ? (
         <p>Loading jobs...</p>
       ) : filteredJobs.length ? (
-        filteredJobs.map((job) => (
-          <JobCard
-            key={job.id}
-            job={job}
-            onApprove={() => handleApprove(job)}
-            onReject={() => handleReject(job.id)}
-            onViewDetails={() => onViewDetails(job)}
-          />
-        ))
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          {filteredJobs.map((job) => (
+            <JobCard
+              key={job.id}
+              job={job}
+              onApprove={() => handleApprove(job)}
+              onReject={() => handleReject(job.id)}
+              onViewDetails={() => onViewDetails(job)}
+            />
+          ))}
+        </div>
       ) : (
         <EmptyState />
       )}
       </div>
-      
+
       {selectedJob && (
         <JobDetailModal
           job={selectedJob}
