@@ -160,7 +160,7 @@ const JobApprovalsPage = () => {
   const confirmApprove = async () => {
     if (!actioningJobId) return;
 
-    const job = pendingJobs.find(j => j.job_id === actioningJobId);
+    const job = pendingJobs.find(j => j.id === actioningJobId);
     if (!job) {
       alert("Job not found");
       return;
@@ -176,8 +176,8 @@ const JobApprovalsPage = () => {
       }
 
       // Get job data safely
-      const employee_id = job.poster_id; // since you mapped poster_id → submittedBy
-      const job_id = job.job_id;
+      const employee_id = job.submittedBy; // since you mapped poster_id → submittedBy
+      const job_id = job.id;
 
       let url = "";
       let body = {};
