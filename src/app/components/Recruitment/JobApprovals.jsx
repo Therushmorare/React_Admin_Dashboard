@@ -46,7 +46,7 @@ const mapApiJobToCard = (j) => ({
   filters: j.filters || [],
   salary: normalizeSalary(j.filters),
   priority: derivePriority(j),
-  submittedBy: j.poster_id ? j.poster_id.slice(0, 8) : "unknown",
+  submittedBy: j.poster_id || "unknown",
 });
 
 const formatMoney = (money) => {
