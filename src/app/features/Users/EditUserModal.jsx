@@ -36,9 +36,63 @@ const EditUserModal = ({ show, onClose, onSave, user, activeTab, roleLabel }) =>
     setFormData(prev => ({ ...prev, [name]: value }));
   };
 
-  const handleSubmit = () => {
-    onSave({ ...user, ...formData });
-    onClose();
+  const handleSubmit = async (userId) => {
+    setUiError("");
+    setSubmitting(true);
+
+    try {
+      const { token } = getAuth();
+      const aid = getEffectiveAid();
+      let url = "";
+      let payload = {};
+
+      if (activeTab === "admin") {
+        // Edit admin
+        url = `${API_BASE}/api/admin/editAdmin/${userId}`;
+        payload = {
+          email: formData.email,
+          first_name: formData.firstName,
+          last_name: formData.lastName,
+          employee_number: formData.employeeNumber,
+          department: formData.department,
+          role: formData.role,
+          phone_number: formData.phoneNumber,
+        };
+      } 
+      else if (activeTab === "recruiter") {
+        // Edit recruiter
+        url = `${API_BASE}/api/admin/editRecruiter/${aid}/${formData.email}`;
+        payload = {
+          admin_id: aid,
+          hr_email: formData.email,
+          hr_employee_number: formData.employeeNumber,
+          first_name: formData.firstName,
+          last_name: formData.lastName,
+        };
+      } 
+
+      if (url) {
+        const res = await fetch(url, { 
+          method: "PUT", 
+          headers: headers(token), 
+          body: JSON.stringify(payload) 
+        });
+        if (!res.ok) throw new Error(await res.text() || `Update failed (${res.status})`);
+      }
+
+      const updatedUser = {
+        id: userId,
+        ...formData,
+        status: formData.status || "active",
+      };
+
+      onEdit?.(updatedUser);
+      handleClose();
+    } catch (e) {
+      setUiError(e.message || "Failed to update user");
+    } finally {
+      setSubmitting(false);
+    }
   };
 
   if (!show || !user) return null;

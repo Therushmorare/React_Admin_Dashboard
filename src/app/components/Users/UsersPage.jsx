@@ -121,23 +121,58 @@ const UsersPage = () => {
   };
 
   const handleDeleteUser = async (userId) => {
+    if (!userId) return;
+
     try {
+      const { token } = getAuth(); // your auth helper
+      const aid = sessionStorage.getItem("user_id");
+
+      let res;
+
       switch (activeTab) {
         case "admin":
-          await UserAPI.deleteAdminUser(userId);
+          if (!aid) throw new Error("Admin ID required to delete an admin.");
+          res = await fetch(`${API_BASE}/api/admin/deleteAdmin/${userId}`, {
+            method: "DELETE",
+            headers: {
+              "Content-Type": "application/json",
+              Authorization: `Bearer ${token}`,
+            },
+            body: JSON.stringify({
+              super_admin_id: aid,
+              role: "SUPER_ADMIN", // adjust as needed
+            }),
+          });
+          if (!res.ok) throw new Error(await res.text() || `Failed to delete admin (${res.status})`);
           setAdminUsers((prev) => prev.filter((u) => u.id !== userId));
           break;
+
         case "recruiter":
-          await UserAPI.deleteRecruiterUser(userId);
+          if (!aid) throw new Error("Admin ID required to delete a recruiter.");
+          res = await fetch(`${API_BASE}/api/admin/deleteRecruiter/${aid}/${userId}`, {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              Authorization: `Bearer ${token}`,
+            },
+            body: JSON.stringify({
+              admin_id: aid,
+              employee_id: userId,
+            }),
+          });
+          if (!res.ok) throw new Error(await res.text() || `Failed to delete recruiter (${res.status})`);
           setRecruiterUsers((prev) => prev.filter((u) => u.id !== userId));
           break;
+
         default:
+          console.warn("Delete not implemented for this user type");
           break;
       }
 
       console.log("User deleted successfully");
     } catch (error) {
       console.error("Error deleting user:", error);
+      alert(error.message || "Failed to delete user");
     }
   };
 

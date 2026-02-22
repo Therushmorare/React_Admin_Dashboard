@@ -47,7 +47,7 @@ const UserActionsDropdown = ({
               <Edit size={14} className="mr-2" />
               Edit User
             </button>
-            <button
+            {/*<button
               onClick={() => {
                 onEditPermissions(user);
                 onClose();
@@ -56,7 +56,7 @@ const UserActionsDropdown = ({
             >
               <Lock size={14} className="mr-2" />
               Edit Permissions
-            </button>
+            </button>*/}
             <button
               onClick={() => {
                 onToggleStatus(user.id);
