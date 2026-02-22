@@ -158,7 +158,7 @@ const AdminDashboard = () => {
       setDepartmentStats(depts);
             } catch (err) {
               console.error('Error fetching dashboard data:', err);
-        }
+        }//comment nje
     };
 
     fetchData();
