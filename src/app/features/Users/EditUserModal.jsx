@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect } from 'react';
 
-const EditUserModal = ({ show, onClose, onSave, user, activeTab, roleLabel }) => {
+const EditUserModal = ({ show, onClose, onEdit, user, activeTab, roleLabel }) => {
   const [formData, setFormData] = useState({
     firstName: '',
     lastName: '',
@@ -14,6 +14,9 @@ const EditUserModal = ({ show, onClose, onSave, user, activeTab, roleLabel }) =>
     aid: '',
     position: ''
   });
+
+  const [uiError, setUiError] = useState("");
+  const [submitting, setSubmitting] = useState(false);
 
   useEffect(() => {
     if (user) {
@@ -36,18 +39,21 @@ const EditUserModal = ({ show, onClose, onSave, user, activeTab, roleLabel }) =>
     setFormData(prev => ({ ...prev, [name]: value }));
   };
 
-  const handleSubmit = async (userId) => {
+  const handleSubmit = async () => {
     setUiError("");
     setSubmitting(true);
 
     try {
-      const { token } = getAuth();
-      const aid = getEffectiveAid();
+      const token = sessionStorage.getItem("access_token");
+      const aid = sessionStorage.getItem("user_id");
+      const userId = user?.id;
+      if (!userId) throw new Error("User ID missing.");
+
       let url = "";
       let payload = {};
+      let method = "PUT";
 
       if (activeTab === "admin") {
-        // Edit admin
         url = `${API_BASE}/api/admin/editAdmin/${userId}`;
         payload = {
           email: formData.email,
@@ -58,9 +64,8 @@ const EditUserModal = ({ show, onClose, onSave, user, activeTab, roleLabel }) =>
           role: formData.role,
           phone_number: formData.phoneNumber,
         };
-      } 
-      else if (activeTab === "recruiter") {
-        // Edit recruiter
+      } else if (activeTab === "recruiter") {
+        if (!aid) throw new Error("Admin ID required for recruiter update.");
         url = `${API_BASE}/api/admin/editRecruiter/${aid}/${formData.email}`;
         payload = {
           admin_id: aid,
@@ -69,25 +74,30 @@ const EditUserModal = ({ show, onClose, onSave, user, activeTab, roleLabel }) =>
           first_name: formData.firstName,
           last_name: formData.lastName,
         };
-      } 
+        method = "POST"; // API expects POST for recruiter edits
+      }
 
       if (url) {
         const res = await fetch(url, { 
-          method: "PUT", 
-          headers: headers(token), 
-          body: JSON.stringify(payload) 
+          method,
+          headers: {
+            "Content-Type": "application/json",
+            ...(token ? { Authorization: `Bearer ${token}` } : {}),
+          },
+          body: JSON.stringify(payload),
         });
+
         if (!res.ok) throw new Error(await res.text() || `Update failed (${res.status})`);
       }
 
       const updatedUser = {
-        id: userId,
+        ...user,
         ...formData,
-        status: formData.status || "active",
+        status: user.status || "active",
       };
 
       onEdit?.(updatedUser);
-      handleClose();
+      onClose();
     } catch (e) {
       setUiError(e.message || "Failed to update user");
     } finally {
@@ -98,11 +108,14 @@ const EditUserModal = ({ show, onClose, onSave, user, activeTab, roleLabel }) =>
   if (!show || !user) return null;
 
   return (
-    <div className="fixed inset-0 bg-opacity-50 z-50 flex items-center justify-center p-4">
+    <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4">
       <div className="bg-white rounded-lg max-w-md w-full p-6">
         <h3 className="text-xl font-semibold text-gray-900 mb-4">Edit {roleLabel}</h3>
-        
+
+        {uiError && <p className="text-red-600 text-sm mb-2">{uiError}</p>}
+
         <div className="space-y-4 max-h-[60vh] overflow-y-auto">
+          {/* First Name */}
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">First Name *</label>
             <input
@@ -114,6 +127,7 @@ const EditUserModal = ({ show, onClose, onSave, user, activeTab, roleLabel }) =>
             />
           </div>
 
+          {/* Last Name */}
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">Last Name *</label>
             <input
@@ -125,6 +139,7 @@ const EditUserModal = ({ show, onClose, onSave, user, activeTab, roleLabel }) =>
             />
           </div>
 
+          {/* Email */}
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">Email *</label>
             <input
@@ -136,6 +151,7 @@ const EditUserModal = ({ show, onClose, onSave, user, activeTab, roleLabel }) =>
             />
           </div>
 
+          {/* Phone */}
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">Phone Number *</label>
             <input
@@ -147,6 +163,7 @@ const EditUserModal = ({ show, onClose, onSave, user, activeTab, roleLabel }) =>
             />
           </div>
 
+          {/* Admin specific */}
           {activeTab === 'admin' && (
             <>
               <div>
@@ -159,7 +176,6 @@ const EditUserModal = ({ show, onClose, onSave, user, activeTab, roleLabel }) =>
                   className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:border-green-700 focus:ring-2 focus:ring-green-100"
                 />
               </div>
-
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">Role *</label>
                 <input
@@ -170,7 +186,6 @@ const EditUserModal = ({ show, onClose, onSave, user, activeTab, roleLabel }) =>
                   className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:border-green-700 focus:ring-2 focus:ring-green-100"
                 />
               </div>
-
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">AID *</label>
                 <input
@@ -184,6 +199,7 @@ const EditUserModal = ({ show, onClose, onSave, user, activeTab, roleLabel }) =>
             </>
           )}
 
+          {/* Department for everyone except applicant */}
           {activeTab !== 'applicant' && (
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">Department *</label>
@@ -197,6 +213,7 @@ const EditUserModal = ({ show, onClose, onSave, user, activeTab, roleLabel }) =>
             </div>
           )}
 
+          {/* Employee Position */}
           {activeTab === 'employee' && (
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">Position *</label>
@@ -220,9 +237,10 @@ const EditUserModal = ({ show, onClose, onSave, user, activeTab, roleLabel }) =>
           </button>
           <button
             onClick={handleSubmit}
-            className="flex-1 px-4 py-2 bg-green-700 text-white rounded-lg hover:bg-green-800"
+            disabled={submitting}
+            className="flex-1 px-4 py-2 bg-green-700 text-white rounded-lg hover:bg-green-800 disabled:opacity-50"
           >
-            Save Changes
+            {submitting ? "Saving..." : "Save Changes"}
           </button>
         </div>
       </div>
