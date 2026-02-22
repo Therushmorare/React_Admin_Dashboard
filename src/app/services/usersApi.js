@@ -32,6 +32,7 @@ const mapAdmin = (a) => ({
   lastName: a.last_name || "",
   email: a.email || "",
   department: normalizeDept(a.departmet || a.department || ""),
+  employeeNumber: a.employee_number,
   role: normalizeRole(a.role),
   phone: a.phone_number || "",
   status: a.is_active ? "active" : "inactive",
