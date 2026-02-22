@@ -1,4 +1,6 @@
 "use client"
+// services/usersApi.js
+const API_BASE = "https://jellyfish-app-z83s2.ondigitalocean.app";
 
 import React, { useState, useEffect } from 'react';
 
