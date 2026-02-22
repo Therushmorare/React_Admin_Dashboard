@@ -55,6 +55,7 @@ const UserTableRow = ({
       )}
       {activeTab === 'recruiter' && (
         <>
+          <td className="py-3 px-4 text-sm text-gray-700">{user.department}</td> {/* <- added */}
           <td className="py-3 px-4">
             <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
               {user.activeJobs || 0} active
