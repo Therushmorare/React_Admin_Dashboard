@@ -53,7 +53,7 @@ const TabNavigation = ({ tabs, activeTab, onTabChange }) => {
 
   return (
     <div className="bg-white rounded-lg shadow-sm p-2 mb-6">
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
+      <div className="grid grid-cols-2 md:grid-cols-2 gap-2">
         {tabs.map(tab => {
           const Icon = tab.icon;
           const isActive = activeTab === tab.id;
