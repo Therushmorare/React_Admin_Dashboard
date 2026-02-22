@@ -43,7 +43,7 @@ const mapHR = (h) => ({
   firstName: h.first_name || "",
   lastName: h.last_name || "",
   email: h.email || "",
-  department: normalizeDept(h.departmet || h.department || ""),
+  department: normalizeDept(h.departmet || h.department || "HR"),
   role: normalizeRole(h.role || "RECRUITER"),
   phone: h.phone_number || "",
   status: h.is_active ? "active" : "inactive",
