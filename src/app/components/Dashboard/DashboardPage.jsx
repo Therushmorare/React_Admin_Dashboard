@@ -26,6 +26,7 @@ const AdminDashboard = () => {
     labels: ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'],
     data: [0,0,0,0,0,0,0]
   });
+  const [departmentStats, setDepartmentStats] = useState([]);
 
   // ====== Fetch data from APIs ======
   useEffect(() => {
@@ -39,7 +40,7 @@ const AdminDashboard = () => {
         ]);
 
         const users = usersRes.data;
-        const jobs = jobsRes.data.jobs || jobsRes.data; // sometimes it's nested
+        const jobs = jobsRes.data.jobs || jobsRes.data; // sometimes nested
         const applicants = applicantsRes.data;
         const hrMembers = hrRes.data;
 
@@ -131,6 +132,21 @@ const AdminDashboard = () => {
         });
         setApplicationStats({ labels: applicationStats.labels, data: counts });
 
+        // ====== Department Stats ======
+        const deptMap = {};
+        applicants.forEach(a => {
+          const dept = a.department || 'Unknown';
+          if (!deptMap[dept]) deptMap[dept] = 0;
+          deptMap[dept]++;
+        });
+        const depts = Object.entries(deptMap).map(([name, count]) => ({
+          name,
+          count,
+          percentage: Math.round((count / applicants.length) * 100),
+          color: ['blue','green','purple','yellow','red'][Math.floor(Math.random()*5)]
+        }));
+        setDepartmentStats(depts);
+
       } catch (err) {
         console.error('Error fetching dashboard data:', err);
       }
@@ -152,7 +168,6 @@ const AdminDashboard = () => {
   };
 
   const maxApplications = Math.max(...applicationStats.data);
-
   return (
     <div className="min-h-screen bg-gray-50">
       {/* ====== Header and Time Filter ====== */}
