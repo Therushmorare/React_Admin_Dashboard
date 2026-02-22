@@ -88,7 +88,13 @@ const UserTableRow = ({
         </span>
       </td>
       <td className="py-3 px-4 text-sm text-gray-700">
-        {new Date(user.joinDate).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })}
+        {user.joinDate
+          ? new Date(user.joinDate).toLocaleDateString('en-GB', {
+              day: 'numeric',
+              month: 'short',
+              year: 'numeric'
+            })
+          : 'N/A'}
       </td>
       <td className="py-3 px-4">
         <UserActionsDropdown
