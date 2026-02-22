@@ -115,7 +115,39 @@ export const UserAPI = {
 
   // ---------- EMPLOYEES ----------
   async getEmployeeUsers() {
-    return []; // replace when endpoint ready
+    const res = await fetch(`${API_BASE}/api/hr/allEmployees`, {
+      headers: getAuthHeaders(),
+      cache: "no-store",
+    });
+
+    if (res.status === 404) return [];
+    if (!res.ok) throw new Error(`Failed to fetch employees (${res.status})`);
+
+    const data = await res.json();
+
+    // API returns: { employee_data: [...] }
+    const employees = Array.isArray(data.employee_data)
+      ? data.employee_data
+      : [];
+
+    return employees.map((e) => ({
+      id: e.employee_id,
+      employeeId: e.employee_id,
+      employeeNumber: e.employee_number || "",
+      firstName: e.first_name || "",
+      lastName: e.last_name || "",
+      email: e.email || "",
+      phone: e.phone_number || "",
+      department: normalizeDept(e.department || ""),
+      role: normalizeRole(e.job_title || "EMPLOYEE"),
+      status: e.status ? e.status.toLowerCase() : "inactive",
+      jobTitle: e.job_title || "",
+      employmentType: e.employment_type || "",
+      nationality: e.nationality || "",
+      idNumber: e.ID_number || "",
+      dob: e.date_of_birth || "",
+      description: e.description || "",
+    }));
   },
 
   async createEmployeeUser(payload) {

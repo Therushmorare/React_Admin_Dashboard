@@ -35,7 +35,7 @@ const UsersPage = () => {
     // If you need an adminId locally for other actions
     if (!localStorage.getItem("adminId")) {
       localStorage.setItem("adminId", "1");
-      console.log("✅ Temporary admin ID set to 1");
+      console.log("Temporary admin ID set to 1");
     }
   }, []);
 
