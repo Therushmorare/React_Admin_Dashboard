@@ -403,9 +403,6 @@ const AdminDashboard = () => {
                           {recruiter.activeJobs} active jobs
                         </span>
                         <span className="text-xs text-gray-400">•</span>
-                        <span className="text-xs text-gray-600">
-                          {recruiter.applicationsReviewed} reviews
-                        </span>
                       </div>
                     </div>
                   </div>
