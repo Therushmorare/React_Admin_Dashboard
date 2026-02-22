@@ -53,9 +53,6 @@ const UserTableRow = ({
           <td className="py-3 px-4 text-sm text-gray-700">{user.role}</td>
         </>
       )}
-      {activeTab === 'employee' && (
-        <td className="py-3 px-4 text-sm text-gray-700">{user.position}</td>
-      )}
       {activeTab === 'recruiter' && (
         <>
           <td className="py-3 px-4">
@@ -64,20 +61,6 @@ const UserTableRow = ({
             </span>
           </td>
           <td className="py-3 px-4 text-sm text-gray-700">{user.applicationsReviewed || 0}</td>
-        </>
-      )}
-      {activeTab === 'applicant' && (
-        <>
-          <td className="py-3 px-4">
-            <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-purple-100 text-purple-800">
-              {user.applicationsSubmitted || 0} submitted
-            </span>
-          </td>
-          <td className="py-3 px-4 text-sm text-gray-700">
-            {user.lastApplication 
-              ? new Date(user.lastApplication).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' }) 
-              : 'N/A'}
-          </td>
         </>
       )}
       <td className="py-3 px-4">

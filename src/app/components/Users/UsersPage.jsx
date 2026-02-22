@@ -42,8 +42,6 @@ const UsersPage = () => {
   const tabs = [
     { id: "admin", label: "Admin Users", icon: Shield, color: "red", count: adminUsers.length },
     { id: "recruiter", label: "HR Recruiters", icon: Briefcase, color: "blue", count: recruiterUsers.length },
-    { id: "employee", label: "Employees", icon: UsersIcon, color: "green", count: employeeUsers.length },
-    { id: "applicant", label: "Applicants", icon: FileText, color: "purple", count: applicantUsers.length },
   ];
 
   useEffect(() => {
@@ -63,16 +61,6 @@ const UsersPage = () => {
         case "recruiter": {
           const recruiters = await UserAPI.getRecruiterUsers();
           setRecruiterUsers(recruiters);
-          break;
-        }
-        case "employee": {
-          const employees = await UserAPI.getEmployeeUsers();
-          setEmployeeUsers(employees);
-          break;
-        }
-        case "applicant": {
-          const applicants = await UserAPI.getApplicantUsers();
-          setApplicantUsers(applicants);
           break;
         }
         default:
@@ -97,8 +85,6 @@ const UsersPage = () => {
           newUser = await UserAPI.createEmployeeUser(userData);
           setEmployeeUsers((prev) => [...prev, newUser]);
           break;
-        case "admin":
-        case "applicant":
         default:
           // Implement when APIs are ready
           break;
@@ -124,15 +110,6 @@ const UsersPage = () => {
           setRecruiterUsers((prev) => prev.map((u) => (u.id === updatedUser.id ? updatedUser : u)));
           break;
         }
-        case "employee": {
-          result = await UserAPI.updateEmployeeUser(updatedUser.id, updatedUser);
-          setEmployeeUsers((prev) => prev.map((u) => (u.id === updatedUser.id ? result : u)));
-          break;
-        }
-        case "applicant": {
-          setApplicantUsers((prev) => prev.map((u) => (u.id === updatedUser.id ? updatedUser : u)));
-          break;
-        }
         default:
           break;
       }
@@ -153,14 +130,6 @@ const UsersPage = () => {
         case "recruiter":
           await UserAPI.deleteRecruiterUser(userId);
           setRecruiterUsers((prev) => prev.filter((u) => u.id !== userId));
-          break;
-        case "employee":
-          await UserAPI.deleteEmployeeUser(userId);
-          setEmployeeUsers((prev) => prev.filter((u) => u.id !== userId));
-          break;
-        case "applicant":
-          await UserAPI.deleteApplicantUser(userId);
-          setApplicantUsers((prev) => prev.filter((u) => u.id !== userId));
           break;
         default:
           break;
@@ -187,12 +156,6 @@ const UsersPage = () => {
         case "recruiter":
           setRecruiterUsers((prev) => prev.map((u) => (u.id === userId ? { ...u, status: newStatus } : u)));
           break;
-        case "employee":
-          setEmployeeUsers((prev) => prev.map((u) => (u.id === userId ? { ...u, status: newStatus } : u)));
-          break;
-        case "applicant":
-          setApplicantUsers((prev) => prev.map((u) => (u.id === userId ? { ...u, status: newStatus } : u)));
-          break;
         default:
           break;
       }
@@ -214,12 +177,6 @@ const UsersPage = () => {
         case "recruiter":
           setRecruiterUsers((prev) => prev.map((u) => (u.id === updatedUser.id ? updatedUser : u)));
           break;
-        case "employee":
-          setEmployeeUsers((prev) => prev.map((u) => (u.id === updatedUser.id ? updatedUser : u)));
-          break;
-        case "applicant":
-          setApplicantUsers((prev) => prev.map((u) => (u.id === updatedUser.id ? updatedUser : u)));
-          break;
         default:
           break;
       }
@@ -236,10 +193,6 @@ const UsersPage = () => {
         return adminUsers;
       case "recruiter":
         return recruiterUsers;
-      case "employee":
-        return employeeUsers;
-      case "applicant":
-        return applicantUsers;
       default:
         return [];
     }
@@ -249,8 +202,6 @@ const UsersPage = () => {
     const labels = {
       admin: "Admin",
       recruiter: "HR Recruiter",
-      employee: "Employee",
-      applicant: "Applicant",
     };
     return labels[activeTab];
   };

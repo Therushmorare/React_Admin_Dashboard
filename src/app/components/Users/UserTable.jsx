@@ -32,19 +32,10 @@ const UserTable = ({
                   <th className="text-left py-3 px-4 text-xs font-semibold text-gray-700 uppercase">Role</th>
                 </>
               )}
-              {activeTab === 'employee' && (
-                <th className="text-left py-3 px-4 text-xs font-semibold text-gray-700 uppercase">Position</th>
-              )}
               {activeTab === 'recruiter' && (
                 <>
                   <th className="text-left py-3 px-4 text-xs font-semibold text-gray-700 uppercase">Active Jobs</th>
                   <th className="text-left py-3 px-4 text-xs font-semibold text-gray-700 uppercase">Apps Reviewed</th>
-                </>
-              )}
-              {activeTab === 'applicant' && (
-                <>
-                  <th className="text-left py-3 px-4 text-xs font-semibold text-gray-700 uppercase">Applications</th>
-                  <th className="text-left py-3 px-4 text-xs font-semibold text-gray-700 uppercase">Last Applied</th>
                 </>
               )}
               <th className="text-left py-3 px-4 text-xs font-semibold text-gray-700 uppercase">Status</th>
