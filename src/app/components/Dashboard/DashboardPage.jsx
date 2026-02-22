@@ -134,22 +134,31 @@ const AdminDashboard = () => {
 
         // ====== Department Stats ======
         const deptMap = {};
-        applicants.forEach(a => {
-          const dept = a.department || 'Unknown';
+
+        // Loop through all jobs
+        jobs.forEach(job => {
+          const dept = job.department || 'Unknown';
+          
+          // Count applicants for this job
+          const applicantsForJob = applicants.filter(a => a.job_id === job.job_id);
+          const count = applicantsForJob.length;
+
           if (!deptMap[dept]) deptMap[dept] = 0;
-          deptMap[dept]++;
+          deptMap[dept] += count; // accumulate applicants per department
         });
+
+        // Transform map into array for rendering
         const depts = Object.entries(deptMap).map(([name, count]) => ({
           name,
           count,
-          percentage: Math.round((count / applicants.length) * 100),
+          percentage: applicants.length > 0 ? Math.round((count / applicants.length) * 100) : 0,
           color: ['blue','green','purple','yellow','red'][Math.floor(Math.random()*5)]
         }));
-        setDepartmentStats(depts);
 
-      } catch (err) {
-        console.error('Error fetching dashboard data:', err);
-      }
+      setDepartmentStats(depts);
+            } catch (err) {
+              console.error('Error fetching dashboard data:', err);
+        }
     };
 
     fetchData();
